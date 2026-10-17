@@ -6,3 +6,6 @@ dist/
 test-results/
 artifacts/
 CODE_DELIVERY.md
+.artifact-build/
+output/
+docs/field-results/

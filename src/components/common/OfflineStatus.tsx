@@ -34,13 +34,14 @@ export function OfflineStatus({ active }: { active: boolean }) {
           'Offline cache is not active. Use the production build, wait for caching, and reload.',
         );
       // Workbox adds revision query parameters to precache keys.
-      const response = await caches.match(new URL('offline-assets.json', document.baseURI), {
+      const resourceBase = new URL(import.meta.env.BASE_URL, location.origin);
+      const response = await caches.match(new URL('offline-assets.json', resourceBase), {
         ignoreSearch: true,
       });
       if (!response) throw new Error('Offline asset checklist is not cached yet.');
       const files = (await response.json()) as string[];
       const matches = await Promise.all(
-        files.map((file) => caches.match(new URL(file, document.baseURI), { ignoreSearch: true })),
+        files.map((file) => caches.match(new URL(file, resourceBase), { ignoreSearch: true })),
       );
       if (!matches.every(Boolean))
         throw new Error(

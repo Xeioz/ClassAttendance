@@ -1,24 +1,23 @@
 import { useState } from 'react';
-import type { AttendancePrivate, Session } from '../../types';
+import type { VaultKeys } from '../../types';
+import { readReportSnapshot } from '../../domain/reports';
 import { exportExcel } from '../../utils/excel';
+import { exportCSV } from '../../utils/csvExport';
 import { errorMessage } from '../../utils/errors';
 
-export function ExportModal({
-  session,
-  attendance,
-}: {
-  session: Session;
-  attendance: Map<string, AttendancePrivate>;
-}) {
+export function ExportModal({ keys, sessionId }: { keys: VaultKeys; sessionId: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  async function run() {
+  async function run(format: 'xlsx' | 'csv') {
     setBusy(true);
     setMessage('');
     try {
-      await exportExcel(session, attendance);
+      const snapshot = await readReportSnapshot(keys, sessionId);
+      if (format === 'xlsx')
+        await exportExcel(snapshot.session, snapshot.attendance, snapshot.audit);
+      else exportCSV(snapshot.session, snapshot.attendance);
       setMessage(
-        'Download requested. Check your browser downloads. The workbook contains personal data.',
+        'Download requested. Check browser downloads. Exported records contain personal data.',
       );
     } catch (error) {
       setMessage(errorMessage(error));
@@ -28,9 +27,14 @@ export function ExportModal({
   }
   return (
     <div>
-      <button className="secondary" disabled={busy} onClick={() => void run()}>
-        {busy ? 'Preparing…' : 'Download Excel report'}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button className="secondary" disabled={busy} onClick={() => void run('xlsx')}>
+          {busy ? 'Preparing…' : 'Download Excel report'}
+        </button>
+        <button className="secondary" disabled={busy} onClick={() => void run('csv')}>
+          Download CSV
+        </button>
+      </div>
       {message ? (
         <p role="status" className="mt-2 text-sm">
           {message}

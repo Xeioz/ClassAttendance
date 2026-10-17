@@ -47,3 +47,18 @@ export class ScanDebounce {
     return true;
   }
 }
+
+export class ContinuousScanGate {
+  private cooldown = new ScanDebounce();
+  private id = '';
+  private seen = -Infinity;
+  accept(id: string, now: number, busy = false): boolean {
+    const held = id === this.id && now - this.seen < 650;
+    if (id === this.id) this.seen = now;
+    // Continuous visibility stays suppressed beyond 1.5s. A deliberate rescan needs a gap.
+    if (held || busy || !this.cooldown.accept(id, now)) return false;
+    this.id = id;
+    this.seen = now;
+    return true;
+  }
+}

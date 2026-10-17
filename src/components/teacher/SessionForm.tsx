@@ -13,6 +13,9 @@ export function SessionForm({
   onCreated: (session: Session) => Promise<void>;
 }) {
   const [course, setCourse] = useState('');
+  const [institution, setInstitution] = useState('');
+  const [subject, setSubject] = useState('');
+  const [room, setRoom] = useState('');
   const [section, setSection] = useState('');
   const [pin, setPin] = useState('');
   const [grace, setGrace] = useState(15);
@@ -28,6 +31,9 @@ export function SessionForm({
     setError('');
     try {
       const session = await createSession(keys, {
+        institution: institution.trim(),
+        subject: subject.trim(),
+        room: room.trim(),
         course,
         section: section || sections[0] || '',
         roomPin: pin,
@@ -48,6 +54,26 @@ export function SessionForm({
         <h2 className="mt-2 text-xl">Start a class session</h2>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
+        <label>
+          Institution (optional)
+          <input
+            value={institution}
+            onChange={(event) => setInstitution(event.target.value)}
+            maxLength={150}
+          />
+        </label>
+        <label>
+          Subject (optional)
+          <input
+            value={subject}
+            onChange={(event) => setSubject(event.target.value)}
+            maxLength={150}
+          />
+        </label>
+        <label>
+          Room (optional)
+          <input value={room} onChange={(event) => setRoom(event.target.value)} maxLength={150} />
+        </label>
         <label>
           Course
           <input

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseQR, punctuality, ScanDebounce } from '../src/domain/qr';
+import { parseQR, punctuality, ScanDebounce, ContinuousScanGate } from '../src/domain/qr';
 import { readRoster } from '../src/utils/csv';
 import { normalizeId } from '../src/utils/normalize';
 
@@ -45,7 +45,9 @@ describe('CSV ingestion', () => {
       'roster.csv',
     );
     const { rows, encoding } = await readRoster(file, 'auto');
-    expect(rows).toEqual([{ id: '0024001', name: 'Peña, José Niño', section: 'BSIT-3A' }]);
+    expect(rows).toEqual([
+      { id: '0024001', displayId: '0024-001', name: 'Peña, José Niño', section: 'BSIT-3A' },
+    ]);
     expect(encoding).toBe('utf-8');
   });
   it('falls back to Windows-1252 with a preview warning', async () => {
@@ -65,5 +67,21 @@ describe('CSV ingestion', () => {
     await expect(readRoster(new File(['id,name\n1,A'], 'r.csv'), 'auto')).rejects.toThrow(
       'headers',
     );
+  });
+});
+describe('continuous camera target suppression', () => {
+  it('records a continuously held target once, then allows a deliberate re-presentation', () => {
+    const gate = new ContinuousScanGate();
+    let accepted = 0;
+    for (let time = 0; time <= 5000; time += 100) if (gate.accept('A', time)) accepted++;
+    expect(accepted).toBe(1);
+    expect(gate.accept('A', 5800)).toBe(true);
+    expect(gate.accept('B', 5900)).toBe(true);
+  });
+  it('does not consume the next student while a write is pending', () => {
+    const gate = new ContinuousScanGate();
+    expect(gate.accept('A', 0)).toBe(true);
+    expect(gate.accept('B', 100, true)).toBe(false);
+    expect(gate.accept('B', 200)).toBe(true);
   });
 });

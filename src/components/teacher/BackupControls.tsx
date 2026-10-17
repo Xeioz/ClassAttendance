@@ -28,9 +28,11 @@ export function BackupControls({ keys }: { keys?: VaultKeys }) {
     if (!file || !confirm) return;
     setBusy(true);
     try {
-      await restoreBackup(file, pin);
+      const restored = await restoreBackup(file, pin);
       setPin('');
-      setMessage('Backup restored. Unlock with the backup PIN.');
+      setMessage(
+        `Restored ${restored.courses} courses, ${restored.students} roster entries, and ${restored.sessions} attendance sessions. Unlock with the backup PIN.`,
+      );
     } catch (error) {
       setMessage(errorMessage(error));
     } finally {

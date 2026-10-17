@@ -45,7 +45,7 @@ export async function readRoster(
     if (identities.has(identity))
       throw new Error(`Row ${index + 2}: duplicate or normalization collision for ${row.id}.`);
     identities.add(identity);
-    return { id, name, section };
+    return { id, displayId: row.id.trim(), name, section };
   });
   return { rows, encoding: used };
 }

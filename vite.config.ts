@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  base: process.env.BASE_PATH || '/',
   plugins: [
     react(),
     {
@@ -16,6 +17,7 @@ export default defineConfig({
               ...Object.keys(bundle).filter((name) => /\.(html|js|css|wasm)$/.test(name)),
               'index.html',
               'icon.svg',
+              'guide.html',
             ]),
           ]),
         });

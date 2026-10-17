@@ -1,13 +1,14 @@
 {
   "name": "portable-qr-attendance",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
+    "field:analyze": "node --experimental-strip-types scripts/analyze-field-run.ts",
     "format": "prettier --write src tests vite.config.ts tailwind.config.js postcss.config.js"
   },
   "dependencies": {
@@ -20,6 +21,8 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@testing-library/react": "16.3.0",
+    "@testing-library/user-event": "14.6.1",
     "@types/node": "22.15.30",
     "@types/papaparse": "5.3.16",
     "@types/qrcode": "1.5.5",
@@ -28,6 +31,7 @@
     "@vitejs/plugin-react": "4.5.2",
     "autoprefixer": "10.4.21",
     "fake-indexeddb": "6.0.1",
+    "jsdom": "26.1.0",
     "postcss": "8.5.6",
     "prettier": "3.5.3",
     "tailwindcss": "3.4.17",

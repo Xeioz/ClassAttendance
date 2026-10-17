@@ -51,7 +51,7 @@ export async function exportBackup(keys: VaultKeys): Promise<void> {
   };
   downloadFile(
     new Blob([JSON.stringify(file)], { type: 'application/json' }),
-    `attendance-backup-${new Date().toISOString().slice(0, 10)}.json`,
+    `attendance_backup_${new Date().toISOString().slice(0, 10)}.enc.json`,
   );
 }
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -70,7 +70,10 @@ function string(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length < 512;
 }
 
-export async function restoreBackup(file: File, pin: string): Promise<void> {
+export async function restoreBackup(
+  file: File,
+  pin: string,
+): Promise<{ students: number; sessions: number; courses: number }> {
   if (file.size > 25 * 1024 * 1024) throw new Error('Backup exceeds the 25 MB restore limit.');
   const raw: unknown = JSON.parse(await file.text());
   if (
@@ -99,6 +102,8 @@ export async function restoreBackup(file: File, pin: string): Promise<void> {
     if (!Array.isArray(data[name]) || data[name].length > 100000)
       throw new Error('Invalid backup table.');
   const sessions = new Set<string>();
+  const courses = new Set<string>();
+  const sessionStudents = new Map<string, Set<string>>();
   for (const row of data.students) {
     if (
       !isObject(row) ||
@@ -135,7 +140,37 @@ export async function restoreBackup(file: File, pin: string): Promise<void> {
       !Number.isFinite(session.startsAt)
     )
       throw new Error('Invalid session data.');
+    if (
+      !/^\d{3,6}$/.test(session.roomPin) ||
+      !Number.isInteger(session.graceMinutes) ||
+      session.graceMinutes < 0 ||
+      session.graceMinutes > 180 ||
+      session.roster.length > 10000
+    )
+      throw new Error('Invalid session settings.');
+    const tokens = new Set<string>();
+    for (const student of session.roster) {
+      if (
+        !isObject(student) ||
+        !string(student.id) ||
+        !string(student.name) ||
+        !string(student.section) ||
+        !string(student.token) ||
+        tokens.has(student.token)
+      )
+        throw new Error('Invalid session roster snapshot.');
+      tokens.add(student.token);
+    }
+    if (session.timezone !== undefined) {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: session.timezone }).format(session.startsAt);
+      } catch {
+        throw new Error('Invalid session timezone.');
+      }
+    }
+    sessionStudents.set(row.id, tokens);
     sessions.add(row.id);
+    courses.add(session.course);
   }
   if (data.sessions.filter((row) => row.state === 'ACTIVE').length > 1)
     throw new Error('Backup has conflicting active sessions.');
@@ -144,6 +179,7 @@ export async function restoreBackup(file: File, pin: string): Promise<void> {
       !isObject(row) ||
       !string(row.studentToken) ||
       !sessions.has(row.sessionId) ||
+      !sessionStudents.get(row.sessionId)?.has(row.studentToken) ||
       !isCipher(row.encrypted)
     )
       throw new Error('Invalid attendance record.');
@@ -154,7 +190,9 @@ export async function restoreBackup(file: File, pin: string): Promise<void> {
     );
     if (
       !['PRESENT', 'LATE', 'ABSENT', 'EXCUSED'].includes(entry.status) ||
-      !Number.isFinite(entry.at)
+      !Number.isFinite(entry.at) ||
+      !['QR', 'MANUAL', 'SYSTEM'].includes(entry.source) ||
+      (entry.originalAt !== undefined && !Number.isFinite(entry.originalAt))
     )
       throw new Error('Invalid attendance data.');
   }
@@ -187,4 +225,5 @@ export async function restoreBackup(file: File, pin: string): Promise<void> {
       await db.scanEvents.bulkAdd(data.scanEvents);
     },
   );
+  return { students: data.students.length, sessions: data.sessions.length, courses: courses.size };
 }

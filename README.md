@@ -4,7 +4,7 @@ A browser-based QR attendance website built with React 19, TypeScript, Vite, Tai
 
 ## Run
 
-Requires a supported Node.js LTS release (Node 22 or later recommended) and pnpm. The first dependency installation requires internet access.
+Requires Node 22.18+ or Node 24 and pnpm. The first dependency installation requires internet access.
 
 ```sh
 pnpm install
@@ -37,8 +37,8 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 3. Create a session for an imported section, choose start time/grace, and announce the 3–6 digit room challenge. Device timezone is explicitly displayed.
 4. Students open Student pass, enter their ID and challenge, and display a QR. Optional ID memory is confined to their browser.
 5. Verify student identity, start the teacher camera, and scan. Choose compatibility decoder if native decoding fails. Manual check-in remains available.
-6. Review saved records; make reasoned corrections where needed. Close the session to mark remaining students absent.
-7. Download an Excel report and an encrypted backup. Check the browser actually saved each file. Keep the backup outside the recording device.
+6. Review saved records and disputes. Use F2 for manual attendance or reasoned corrections. Resolve disputes before closure. Closed sessions are read-only; reopen with a reason before changes.
+7. Download an Excel/CSV report and an encrypted backup. Excel includes a separate audit worksheet. Check the browser actually saved each file. Keep the backup outside the recording device.
 8. To restore, lock teacher records, choose the backup and its PIN, acknowledge replacement, and restore. Existing data is replaced only after validation, inside a database transaction.
 
 ## Implementation map
@@ -49,9 +49,10 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 | B: student ID and dynamic QR | `src/components/student/StudentPass.tsx`, `DynamicQR.tsx`, `src/hooks/wakeLock.ts` |
 | C: roster and camera | `src/components/teacher/RosterUpload.tsx`, `ScannerView.tsx`, `src/utils/csv.ts`, `camera.ts` |
 | C: accessible HUD and feedback | `src/components/common/AccessibleHUD.tsx`, `src/utils/feedback.ts` |
-| D: sessions and transactions | `src/domain/attendance.ts`, `qr.ts`, `src/components/teacher/SessionForm.tsx` |
-| D: Excel | `src/components/teacher/ExportModal.tsx`, `src/utils/excel.ts` |
-| Teacher orchestration | `src/components/teacher/TeacherPortal.tsx` |
+| D: sessions and transactions | `src/domain/attendance.ts`, `checkIn.ts`, `sessionLifecycle.ts`, `qr.ts` |
+| D: reports | `src/domain/reports.ts`, `src/utils/excel.ts`, `csvExport.ts` |
+| Disputes and audit | `src/domain/audit.ts`, `src/components/teacher/DisputePanel.tsx`, `AuditTrail.tsx` |
+| Teacher orchestration | `src/components/teacher/TeacherPortal.tsx`, `TeacherWorkspace.tsx`, `ManualEntryDialog.tsx` |
 | Offline caching | `vite.config.ts`, `src/components/common/OfflineStatus.tsx` |
 
 Files use `.ts`/`.tsx` instead of `.js`/`.jsx` to enforce strict TypeScript. `ExportModal` is an inline export control rather than a focus-trapping dialog; session rules are in the domain layer, not inside the export component.
@@ -74,19 +75,23 @@ Files use `.ts`/`.tsx` instead of `.js`/`.jsx` to enforce strict TypeScript. `Ex
 - All built JS/CSS and lazy decoder/export chunks are precached; no classroom runtime CDN requests are needed. The SheetJS official tarball is an install-time dependency, not a runtime CDN script.
 - Click Check offline readiness, then perform an actual cold offline launch. A readiness result checks cached resource existence, not a permanent guarantee against browser deletion or corruption.
 - `navigator.storage.persist()` can be unavailable or denied. Browser storage is finite; clearing website data or losing the device can lose records. Keep backups.
-- Writes and audit attempts commit transactionally before success feedback. A compound database primary key prevents duplicate attendance even with concurrent scans. The 1.5-second camera debounce only reduces repeated UI events.
+- Writes and audit attempts commit transactionally before success feedback. A compound database primary key prevents duplicate attendance even with concurrent scans. A 1.5-second cooldown and continuous-target gate suppress held passes until the target clears; neither is an attendance integrity control.
 - The local database is authoritative; there is no server sync. Use one teacher device per class. Multiple tabs cannot create duplicate attendance records or competing active sessions, but interfaces refresh on focus rather than providing collaborative live synchronization.
 - Website updates are prompted and blocked by the update action while an active local session exists. First installation may activate normally. Keep the hosting origin stable; changing it does not transfer local browser records.
 - Camera requires HTTPS/localhost and permission. Rear camera preference, camera selection after permission, and torch are capability-based. Wake lock and vibration are optional. Wake lock does not force brightness.
 - Default timezone is the teacher device's browser timezone, explicitly displayed during session creation. Export timestamps use UTC. The device clock is not externally trusted. Correct queued students manually when cutoff fairness requires it.
 - QR freshness accepts 90 seconds past / 30 seconds future, allowing boundary/clock tolerance. These windows do not prevent replay. The unique attendance record is the real duplicate control.
 - CSV accepts UTF-8/BOM and Windows-1252 fallback or explicit selection. Arbitrary encoding detection is not claimed. Import rejects normalization collisions within a section. Confirm the ID normalization policy with the institution before importing real rosters.
-- Excel reports include summary values, widths, merged title, filters and percentage number formatting. SheetJS Community Edition does not supply arbitrary styled badge/cell rendering here.
+- Excel reports include institution/subject/room metadata, status shares, a complete audit worksheet, widths, merged title, filters and percentage formats. CSV includes formula guards. SheetJS Community Edition does not supply arbitrary styled badge/cell rendering here.
 - Backup restore is limited to 25 MB and 100,000 rows per table. Larger archives require an evaluated streaming approach.
 
 ## Validation and remaining release work
 
 Automated tests cover crypto authentication/tampering, ID and QR validation, encoding, exact debounce/timing boundaries, concurrent duplicate writes, audit-write failures, closure, historical roster snapshots, wrong PINs, and backup recovery.
+
+Phase 3 adds read-only closure, reasoned reopening, dispute review, original timestamps, coherent report snapshots, and a native manual dialog. Phase 4 adds CI, an opt-in Pages deployment workflow, field observation tooling, user guides, and defense artifacts. See [implementation record](docs/phase-3-4.md), [teacher guide](docs/teacher-guide.md), [deployment](docs/deployment.md), and [field protocol](docs/field-protocol.md).
+
+The field template deliberately contains no measurements. Analyze a completed run with `pnpm field:analyze measured.csv summary.json`. Synthetic unit fixtures verify arithmetic and never establish classroom performance. Generated PDFs and editable decks are available under `docs/handouts/`; their source generators are in `scripts/` and require the bundled artifact runtime/ReportLab described by their command-line arguments.
 
 Before using real student records, validate actual camera scanning on supported Android/iOS/desktop browsers, camera permission/denial, glare and damaged displays, cold offline startup, low-storage conditions, interruption/power-loss behavior, screen readers/zoom, backup restoration on another physical device, browser download behavior, and institutional privacy procedures. The code is an implemented baseline, not a certification that these device and operational checks have passed.
 

@@ -10,6 +10,7 @@ import {
   listSessions,
   listStudents,
   recordAttendance,
+  reopenSession,
   saveRoster,
 } from '../src/domain/attendance';
 import { exportBackup, restoreBackup } from '../src/db/backup';
@@ -81,15 +82,20 @@ describe('attendance transactions', () => {
       'Close',
     );
     await closeSession(keys, session);
+    await expect(
+      correctAttendance(keys, session.id, session.roster[0], 'EXCUSED', 'Approved absence'),
+    ).rejects.toThrow('Reopen');
+    await reopenSession(keys, session.id, 'Correct excused student');
     await correctAttendance(keys, session.id, session.roster[0], 'EXCUSED', 'Approved absence');
     expect((await getAttendance(keys, session.id)).get(session.roster[0].token)?.status).toBe(
       'EXCUSED',
     );
+    await closeSession(keys, session);
     await saveRoster(keys, [{ id: '2024-001', name: 'New Name', section: 'A' }]);
     expect((await listSessions(keys))[0].roster.find((row) => row.id === '2024001')?.name).toBe(
       'Peña, José',
     );
-    expect(await db.scanEvents.count()).toBe(2);
+    expect(await db.scanEvents.count()).toBe(4);
   });
   it('rejects wrong PINs and conflicting active sessions', async () => {
     await fixture();

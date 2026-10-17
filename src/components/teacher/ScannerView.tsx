@@ -1,14 +1,16 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ScanDebounce } from '../../domain/qr';
+import { ContinuousScanGate } from '../../domain/qr';
 import { startCamera, type CameraHandle } from '../../utils/camera';
 import { errorMessage } from '../../utils/errors';
 
 export function ScannerView({
   onScan,
   onPending,
+  paused = false,
 }: {
   onScan: (value: string) => Promise<void>;
   onPending: (pending: boolean) => void;
+  paused?: boolean;
 }) {
   const hostId = `camera-${useId().replace(/[^a-z0-9]/gi, '')}`;
   const [running, setRunning] = useState(false);
@@ -26,11 +28,11 @@ export function ScannerView({
   const processing = useRef(false);
   const stopPromise = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
-    if (!running) return;
+    if (!running || paused) return;
     let disposed = false;
-    const debounce = new ScanDebounce();
+    const debounce = new ContinuousScanGate();
     async function read(raw: string) {
-      if (disposed || processing.current) return;
+      if (disposed) return;
       let identity = raw;
       try {
         const value = JSON.parse(raw) as { id?: unknown };
@@ -38,7 +40,7 @@ export function ScannerView({
       } catch {
         /* Validation reports malformed codes. */
       }
-      if (!debounce.accept(identity, performance.now())) return;
+      if (!debounce.accept(identity, performance.now(), processing.current)) return;
       processing.current = true;
       latestPending.current(true);
       try {
@@ -92,7 +94,7 @@ export function ScannerView({
       // Await startup too: permission prompts may resolve after the component unmounts.
       stopPromise.current = startPromise.then(() => handle?.stop()).catch(() => {});
     };
-  }, [running, device, fallback, hostId]);
+  }, [running, device, fallback, hostId, paused]);
   async function toggleTorch() {
     try {
       await camera.current?.torch(!torch);

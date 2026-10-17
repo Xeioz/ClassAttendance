@@ -5,6 +5,7 @@ export interface Cipher {
 }
 export interface StudentPrivate {
   id: string;
+  displayId?: string;
   name: string;
   section: string;
 }
@@ -23,6 +24,11 @@ export interface SessionPrivate {
   startsAt: number;
   graceMinutes: number;
   roster: Student[];
+  institution?: string;
+  subject?: string;
+  room?: string;
+  timezone?: string;
+  closedAt?: number;
 }
 export interface SessionRow {
   id: string;
@@ -37,8 +43,9 @@ export type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED';
 export interface AttendancePrivate {
   status: AttendanceStatus;
   at: number;
-  source: 'QR' | 'MANUAL';
+  source: 'QR' | 'MANUAL' | 'SYSTEM';
   reason?: string;
+  originalAt?: number;
 }
 export interface AttendanceRow {
   sessionId: string;
@@ -72,4 +79,25 @@ export type ScanResult = {
   kind: 'valid' | 'duplicate' | 'unknown' | 'error';
   title: string;
   detail: string;
+  studentToken?: string;
+  firstAt?: number;
+  secondAt?: number;
 };
+
+export interface AuditPayload {
+  action: string;
+  at: number;
+  performedBy: 'TEACHER_PIN' | 'SYSTEM';
+  studentToken?: string;
+  studentId?: string;
+  previousStatus?: AttendanceStatus;
+  newStatus?: AttendanceStatus;
+  reason?: string;
+  firstAt?: number;
+  secondAt?: number;
+  disputeId?: string;
+}
+export interface AuditEntry extends AuditPayload {
+  eventId: string;
+  sessionId: string;
+}
