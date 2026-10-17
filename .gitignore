@@ -1,0 +1,8 @@
+node_modules/
+.pnpm-store/
+dist/
+*.tsbuildinfo
+.vite/
+test-results/
+artifacts/
+CODE_DELIVERY.md

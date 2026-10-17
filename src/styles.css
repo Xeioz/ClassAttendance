@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply m-0 bg-paper text-ink antialiased;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-semibold tracking-tight;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    @apply min-h-12 rounded-lg;
+  }
+  button {
+    @apply font-semibold;
+  }
+  input,
+  select,
+  textarea {
+    @apply w-full border border-slate-400 bg-white px-3 py-2 text-ink;
+  }
+  label {
+    @apply grid gap-2 text-sm font-semibold;
+  }
+  :focus-visible {
+    outline: 3px solid #1d4ed8;
+    outline-offset: 3px;
+  }
+  button:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+}
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7;
+  }
+  .btn {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-forest px-5 py-3 text-sm text-white hover:bg-emerald-950;
+  }
+  .secondary {
+    @apply inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-ink hover:bg-slate-100;
+  }
+  .eyebrow {
+    @apply text-xs font-bold uppercase tracking-widest text-emerald-800;
+  }
+  .notice {
+    @apply rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950;
+  }
+}
+video {
+  max-width: 100%;
+  border-radius: 12px;
+}
+canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
