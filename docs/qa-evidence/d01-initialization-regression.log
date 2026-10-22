@@ -1,0 +1,12 @@
+
+ RUN  v3.2.4 /workspace/ClassAttendance
+
+ ❯ tests/dispute-ui.test.tsx (7 tests | 1 failed | 6 skipped) 1219ms
+   ↓ stable duplicate dispute review > binds reason and both timestamps to Alice when a later scan changes to Bob
+   ↓ stable duplicate dispute review > preserves the correct draft on failure and retries without retargeting
+   ↓ stable duplicate dispute review > cancels all draft fields before reviewing another candidate or session
+   ↓ stable duplicate dispute review > does not clear a new-session review when an older submission finishes
+   × stable duplicate dispute review > keeps a fast first scan when the newly mounted dispute panel reports its idle state 1217ms
+     → Unable to find role="button" and name "Review duplicate check-in"
+
+[DOM diagnostic omitted; this is the intentional pre-fix failing run.]

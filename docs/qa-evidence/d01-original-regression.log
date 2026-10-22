@@ -1,0 +1,26 @@
+
+ RUN  v3.2.4 /workspace/ClassAttendance
+
+ ❯ tests/dispute-ui.test.tsx (6 tests | 1 failed | 5 skipped) 1129ms
+   × stable duplicate dispute review > binds reason and both timestamps to Alice when a later scan changes to Bob 1127ms
+     → expected "spy" to be called with arguments: [ {}, 'session-1', 'alice', …(3) ]
+
+Received:
+
+  1st spy call:
+
+  [
+    {},
+    "session-1",
+-   "alice",
++   "bob",
+    "Alice identity mismatch",
+-   2000,
+-   1000,
++   4000,
+  ]
+
+
+Number of calls: 1
+
+[DOM diagnostic omitted; this is the intentional pre-fix failing run.]

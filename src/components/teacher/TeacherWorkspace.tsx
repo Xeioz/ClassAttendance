@@ -47,6 +47,20 @@ export function TeacherWorkspace({
   const [sound, setSound] = useState(false);
   const [query, setQuery] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
+  const [disputeReviewOpen, setDisputeReviewOpen] = useState(false);
+  const scanGeneration = useRef(0);
+  const disputeReviewState = useRef(false);
+  const onDisputeReviewChange = useCallback((reviewing: boolean) => {
+    // Mount/refresh can report the existing idle state after a fast first scan.
+    // Only an actual review transition may invalidate a scan result.
+    if (disputeReviewState.current === reviewing) return;
+    disputeReviewState.current = reviewing;
+    // A scan begun before opening/cancelling review may finish saving, but its
+    // result must not become a fresh review target after that transition.
+    scanGeneration.current++;
+    setDisputeReviewOpen(reviewing);
+    if (!reviewing) setResult(undefined);
+  }, []);
   const [confirmClose, setConfirmClose] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const sequence = useRef(0);
@@ -92,14 +106,20 @@ export function TeacherWorkspace({
   }, [refresh]);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
-      if (event.key === 'F2' && session?.state === 'ACTIVE' && !pending && !busy) {
+      if (
+        event.key === 'F2' &&
+        session?.state === 'ACTIVE' &&
+        !pending &&
+        !busy &&
+        !disputeReviewOpen
+      ) {
         event.preventDefault();
         setManualOpen(true);
       }
     };
     window.addEventListener('keydown', shortcut);
     return () => window.removeEventListener('keydown', shortcut);
-  }, [session?.state, pending, busy]);
+  }, [session?.state, pending, busy, disputeReviewOpen]);
   async function refreshAfterSave() {
     try {
       if (!selectedId) return;
@@ -117,13 +137,17 @@ export function TeacherWorkspace({
   }
   async function scan(raw: string) {
     if (!session) return;
+    const scanSessionId = session.id;
+    const generation = scanGeneration.current;
     try {
-      const outcome = await recordAttendance(keys, session.id, { raw });
-      setResult(outcome);
+      const outcome = await recordAttendance(keys, scanSessionId, { raw });
+      if (currentId.current === scanSessionId && generation === scanGeneration.current)
+        setResult(outcome);
       if (outcome.kind !== 'duplicate') feedback(outcome.kind === 'valid', sound);
       await refreshAfterSave();
     } catch (error) {
-      setResult({ kind: 'error', title: 'Not saved', detail: errorMessage(error) });
+      if (currentId.current === scanSessionId && generation === scanGeneration.current)
+        setResult({ kind: 'error', title: 'Not saved', detail: errorMessage(error) });
       feedback(false, sound);
     }
   }
@@ -160,7 +184,9 @@ export function TeacherWorkspace({
   const pendingDisputes = unresolvedDisputes(events).length;
   const filtered =
     session?.roster.filter((student) =>
-      `${student.name} ${student.id}`.toLowerCase().includes(query.toLowerCase()),
+      `${student.name} ${student.id} ${student.displayId ?? ''}`
+        .toLowerCase()
+        .includes(query.trim().toLowerCase()),
     ) ?? [];
   return (
     <div className="mb-5 grid gap-5">
@@ -180,7 +206,7 @@ export function TeacherWorkspace({
           Session history
           <select
             value={selectedId}
-            disabled={busy || pending || manualOpen}
+            disabled={busy || pending || manualOpen || disputeReviewOpen}
             onChange={(event) => {
               sequence.current++;
               setSelectedId(event.target.value);
@@ -223,7 +249,7 @@ export function TeacherWorkspace({
                   {session.graceMinutes} minute grace
                 </p>
               </div>
-              <ExportModal keys={keys} sessionId={session.id} />
+              <ExportModal keys={keys} session={session} auditCount={events.length} />
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-6">
               {[
@@ -251,7 +277,7 @@ export function TeacherWorkspace({
                 <h2 className="text-xl">Record attendance</h2>
                 <button
                   className="secondary"
-                  disabled={pending || busy}
+                  disabled={pending || busy || disputeReviewOpen}
                   onClick={() => setManualOpen(true)}
                 >
                   Manual check-in / correction (F2)
@@ -276,7 +302,7 @@ export function TeacherWorkspace({
                 key={session.id}
                 onScan={scan}
                 onPending={setPending}
-                paused={manualOpen}
+                paused={manualOpen || disputeReviewOpen}
               />
               {manualOpen ? (
                 <p className="text-sm">Camera paused while manual attendance is open.</p>
@@ -319,6 +345,7 @@ export function TeacherWorkspace({
             events={events}
             candidate={result}
             onChanged={refreshAfterSave}
+            onReviewChange={onDisputeReviewChange}
           />
           <section className="card">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -379,7 +406,9 @@ export function TeacherWorkspace({
                 </label>
                 <button
                   className="secondary mt-3"
-                  disabled={!confirmClose || busy || pending || pendingDisputes > 0}
+                  disabled={
+                    !confirmClose || busy || pending || disputeReviewOpen || pendingDisputes > 0
+                  }
                   onClick={() => void finish()}
                 >
                   Close attendance session

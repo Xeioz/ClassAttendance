@@ -3,6 +3,25 @@ import type { AttendancePrivate, Session } from '../types';
 import { recordedTime, reportFilename, sessionDate } from '../domain/reports';
 import { downloadFile } from './download';
 
+export const CSV_HEADERS = [
+  'Student ID',
+  'Official name',
+  'Section',
+  'Status',
+  'First recorded (UTC)',
+  'Last changed (UTC)',
+  'Source',
+  'Reason',
+  'Institution',
+  'Course',
+  'Subject',
+  'Room',
+  'Class date',
+  'Timezone',
+  'Session ID',
+  'Session state',
+];
+
 export function spreadsheetSafe(value: string): string {
   return /^[\s]*[=+@-]|^[\t\r\n]/.test(value) ? `'${value}` : value;
 }
@@ -35,7 +54,7 @@ export function attendanceCSV(
     .map((row) =>
       Object.fromEntries(Object.entries(row).map(([key, value]) => [key, spreadsheetSafe(value)])),
     );
-  return '\uFEFF' + Papa.unparse(rows, { newline: '\r\n' });
+  return '\uFEFF' + Papa.unparse({ fields: CSV_HEADERS, data: rows }, { newline: '\r\n' });
 }
 export function exportCSV(session: Session, attendance: Map<string, AttendancePrivate>): void {
   downloadFile(

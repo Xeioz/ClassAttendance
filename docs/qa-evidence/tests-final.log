@@ -1,0 +1,35 @@
+$ vitest run
+
+ RUN  v3.2.4 /workspace/ClassAttendance
+
+ ✓ tests/dispute-ui.test.tsx (7 tests) 1083ms
+ ✓ tests/teacher-ui.test.tsx (1 test) 1416ms
+   ✓ teacher interface workflow > opens F2 manual dialog, saves excusal, closes read-only, and reopens with a reason  1411ms
+ ✓ tests/restore-search-ui.test.tsx (5 tests) 2072ms
+   ✓ restore interface regression > refreshes a fresh portal immediately and unlocks restored records without navigation  854ms
+   ✓ restore interface regression > preserves existing unlock mode and data after a wrong-PIN restore  410ms
+   ✓ restore interface regression > clears an earlier success when another restore fails  419ms
+ ✓ tests/roster-preview.test.tsx (2 tests) 436ms
+   ✓ complete roster preview > lets teachers inspect every row and search displayed/canonical IDs without narrowing the merge  392ms
+ ✓ tests/attendance.test.ts (8 tests) 1321ms
+   ✓ encrypted backup recovery > restores records after local deletion and rejects a wrong PIN without changing current data  356ms
+ ✓ tests/excel.test.ts (4 tests) 480ms
+ ✓ tests/phase3.test.ts (4 tests) 479ms
+ ✓ tests/crypto.test.ts (3 tests) 339ms
+ ✓ tests/domain.test.ts (9 tests) 18ms
+ ✓ tests/fieldMetrics.test.ts (2 tests) 5ms
+ ✓ tests/backup-validation.test.ts (36 tests) 7291ms
+   ✓ backup schema validation before replacement > rejects an authenticated object-valued reason before replacing any table and keeps the workspace unlockable  456ms
+   ✓ backup schema validation before replacement > rejects malformed audit action without modifying the current database  335ms
+   ✓ backup schema validation before replacement > rejects malformed audit at without modifying the current database  317ms
+   ✓ backup schema validation before replacement > rejects malformed audit at without modifying the current database  330ms
+   ✓ backup schema validation before replacement > rejects malformed audit performedBy without modifying the current database  437ms
+   ✓ backup schema validation before replacement > rejects malformed audit newStatus without modifying the current database  310ms
+   ✓ backup schema validation before replacement > rejects duplicate primary keys, wrong roster relationships and conflicting active sessions  514ms
+   ✓ backup schema validation before replacement > rejects invalid HMAC identity relationships and malformed payload roots  323ms
+   ✓ current and legacy recovery compatibility > restores current history including legitimate unlisted scans and completed disputes  441ms
+
+ Test Files  11 passed (11)
+      Tests  81 passed (81)
+   Start at  10:11:04
+   Duration  11.73s (transform 1.14s, setup 0ms, collect 3.96s, tests 14.94s, environment 2.43s, prepare 1.60s)
