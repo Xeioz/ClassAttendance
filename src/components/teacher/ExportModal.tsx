@@ -4,6 +4,7 @@ import { readReportSnapshot } from '../../domain/reports';
 import { exportExcel } from '../../utils/excel';
 import { exportCSV } from '../../utils/csvExport';
 import { errorMessage } from '../../utils/errors';
+import { t } from '../../i18n';
 
 export function ExportModal({
   keys,
@@ -25,7 +26,13 @@ export function ExportModal({
         await exportExcel(snapshot.session, snapshot.attendance, snapshot.audit);
       else exportCSV(snapshot.session, snapshot.attendance);
       setMessage(
-        `Download requested for the entire ${snapshot.session.course} / ${snapshot.session.section} session: ${snapshot.session.roster.length} students, ${snapshot.session.state === 'ACTIVE' ? 'in progress, not final' : 'closed / reconciled'}. Check browser downloads. Exported records contain personal data.`,
+        t('export.requested', {
+          course: snapshot.session.course,
+          section: snapshot.session.section,
+          count: snapshot.session.roster.length,
+          state:
+            snapshot.session.state === 'ACTIVE' ? t('export.activeRequested') : t('export.closed'),
+        }),
       );
     } catch (error) {
       setMessage(errorMessage(error));
@@ -36,18 +43,20 @@ export function ExportModal({
   return (
     <div>
       <p className="mb-2 max-w-xl text-sm">
-        Export entire selected session: {session.course} / {session.section} ·{' '}
-        {session.roster.length} students ·{' '}
-        {session.state === 'ACTIVE' ? 'In progress — not final' : 'Closed / reconciled'}. Roster
-        search does not filter downloads. Excel includes all {auditCount} audit events; CSV contains
-        attendance only.
+        {t('export.scope', {
+          course: session.course,
+          section: session.section,
+          count: session.roster.length,
+          state: session.state === 'ACTIVE' ? t('export.active') : t('export.closedTitle'),
+          auditCount,
+        })}
       </p>
       <div className="flex flex-wrap gap-2">
         <button className="secondary" disabled={busy} onClick={() => void run('xlsx')}>
-          {busy ? 'Preparing…' : 'Download Excel report'}
+          {busy ? t('export.preparing') : t('export.excel')}
         </button>
         <button className="secondary" disabled={busy} onClick={() => void run('csv')}>
-          Download CSV
+          {t('export.csv')}
         </button>
       </div>
       {message ? (

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { OfflineStatus } from './components/common/OfflineStatus';
 import { StudentPass } from './components/student/StudentPass';
 import { TeacherPortal } from './components/teacher/TeacherPortal';
+import { t } from './i18n';
 
 export function App() {
   const [role, setRole] = useState<'student' | 'teacher'>('student');
@@ -9,15 +10,9 @@ export function App() {
   if (!window.isSecureContext)
     return (
       <main className="card mx-auto my-12 max-w-xl">
-        <h1 className="text-2xl">Secure connection required</h1>
-        <p className="mt-4">
-          Open this website over HTTPS. Camera access, encryption, and offline caching require a
-          secure browser context.
-        </p>
-        <p className="mt-3 text-sm">
-          Local development can use localhost or 127.0.0.1 on the same computer. A plain HTTP
-          address on the classroom network is not sufficient.
-        </p>
+        <h1 className="text-2xl">{t('app.secureTitle')}</h1>
+        <p className="mt-4">{t('app.secureDescription')}</p>
+        <p className="mt-3 text-sm">{t('app.secureLocal')}</p>
       </main>
     );
   return (
@@ -26,7 +21,7 @@ export function App() {
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:bg-white focus:p-4"
       >
-        Skip to content
+        {t('app.skip')}
       </a>
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-5">
@@ -35,9 +30,9 @@ export function App() {
             className="flex items-center gap-3 text-lg font-semibold"
           >
             <img src={`${import.meta.env.BASE_URL}icon.svg`} width="40" height="40" alt="" />
-            Attendance Desk
+            {t('app.title')}
           </a>
-          <nav aria-label="Workspace" className="flex gap-2">
+          <nav aria-label={t('app.navigation')} className="flex flex-wrap gap-2">
             {(['student', 'teacher'] as const).map((item) => (
               <button
                 key={item}
@@ -48,7 +43,7 @@ export function App() {
                   setActive(false);
                 }}
               >
-                {item === 'student' ? 'Student pass' : 'Teacher workspace'}
+                {item === 'student' ? t('app.studentTab') : t('app.teacherTab')}
               </button>
             ))}
           </nav>
@@ -56,14 +51,12 @@ export function App() {
       </header>
       <main id="main" className="mx-auto max-w-6xl px-5 py-8 sm:py-12">
         <div className="mb-7">
-          <p className="eyebrow">Portable QR attendance · Browser based</p>
+          <p className="eyebrow">{t('app.eyebrow')}</p>
           <h1 className="mt-3 text-3xl sm:text-4xl">
-            {role === 'student' ? 'Ready for class.' : 'Your class. Your records.'}
+            {role === 'student' ? t('app.studentTitle') : t('app.teacherTitle')}
           </h1>
           <p className="mt-3 max-w-2xl text-slate-600">
-            {role === 'student'
-              ? 'Display your pass in this browser. No installation required.'
-              : 'Manage attendance locally, with a manual fallback and encrypted backups.'}
+            {role === 'student' ? t('app.studentDescription') : t('app.teacherDescription')}
           </p>
         </div>
         <OfflineStatus active={active} />
@@ -74,11 +67,10 @@ export function App() {
           className="mb-3 inline-flex min-h-12 items-center font-semibold underline"
           href={`${import.meta.env.BASE_URL}guide.html`}
         >
-          Teacher & student guide
+          {t('app.guide')}
         </a>
         <br />
-        Initial loading requires internet. Offline use requires prepared browser storage. Teacher
-        identity verification remains necessary.
+        {t('app.footer')}
       </footer>
     </>
   );

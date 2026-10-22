@@ -1,5 +1,7 @@
 # Attendance Desk implementation and QA status
 
+This is the retained QA-remediation record. The later class-template, roster-review, readiness, and accessibility increment is documented in the [next-release implementation report](next-release-status.md). Its concurrency safeguards and roster comparison supersede the corresponding proposals below.
+
 Verified on 2026-10-22 against the implementation branch `fix/attendance-qa-and-excel`. The starting tree was the audited `prototypeV1` commit [`cbd4133a8eda59ea0848985fb85c01c9c4f463b4`](https://github.com/Xeioz/ClassAttendance/commit/cbd4133a8eda59ea0848985fb85c01c9c4f463b4), with no intervening source changes or unrelated working-tree edits. The previous full audit and evidence were available and inspected. Its D/P identifiers are retained below.
 
 **D-01 through D-04 are fixed and verified within the automated and local-browser scope.** The application now generates formatted Excel workbooks, and recurring checks reconcile the serialized files. Classroom release remains pending the deployment, physical-device and institutional gates below.

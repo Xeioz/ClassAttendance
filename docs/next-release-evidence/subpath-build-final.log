@@ -1,0 +1,31 @@
+$ tsc -b && vite build --base=/ClassAttendance/ --outDir=/workspace/next-release-qa/dist-subpath
+vite v6.3.6 building for production...
+
+(!) outDir /workspace/next-release-qa/dist-subpath is not inside project root and will not be emptied.
+Use --emptyOutDir to override.
+
+transforming...
+✓ 165 modules transformed.
+rendering chunks...
+computing gzip size...
+../next-release-qa/dist-subpath/offline-assets.json                           0.20 kB │ gzip:   0.16 kB
+../next-release-qa/dist-subpath/manifest.webmanifest                          0.32 kB
+../next-release-qa/dist-subpath/index.html                                    0.75 kB │ gzip:   0.40 kB
+../next-release-qa/dist-subpath/assets/index-B9kJ7UF7.css                    14.82 kB │ gzip:   3.70 kB
+../next-release-qa/dist-subpath/assets/workbox-window.prod.es5-BBnX5xw4.js    5.75 kB │ gzip:   2.36 kB
+../next-release-qa/dist-subpath/assets/index-9F5ymbjP.js                    334.68 kB │ gzip:  99.93 kB
+../next-release-qa/dist-subpath/assets/index-QyciEyZU.js                    479.23 kB │ gzip: 152.31 kB
+../next-release-qa/dist-subpath/assets/exceljs.min-C8e-MGTQ.js              940.19 kB │ gzip: 271.33 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 8.43s
+
+PWA v1.0.0
+mode      generateSW
+precache  11 entries (1740.94 KiB)
+files generated
+  ../next-release-qa/dist-subpath/sw.js
+  ../next-release-qa/dist-subpath/workbox-9c191d2f.js

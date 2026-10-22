@@ -1,5 +1,6 @@
 import { decrypt, ITERATIONS, privateToken } from './crypto';
 import { normalizeId, sectionKey } from '../utils/normalize';
+import { validateTemplateData } from '../domain/templates';
 import type {
   AttendancePrivate,
   AttendanceRow,
@@ -10,6 +11,7 @@ import type {
   Student,
   StudentPrivate,
   StudentRow,
+  TemplateRow,
   VaultKeys,
   VaultMeta,
 } from '../types';
@@ -22,7 +24,10 @@ export interface BackupData {
   sessions: SessionRow[];
   attendance: AttendanceRow[];
   scanEvents: EventRow[];
+  /** Absent only in the supported legacy v1 backup format. */
+  classTemplates?: TemplateRow[];
 }
+type ValidatedBackupData = BackupData & { classTemplates: TemplateRow[] };
 const statuses = ['PRESENT', 'LATE', 'ABSENT', 'EXCUSED'] as const;
 const actions = [
   'SCAN_LOGGED',
@@ -219,16 +224,19 @@ interface CheckedEvent {
 export async function validateBackupData(
   value: unknown,
   keys: VaultKeys,
-): Promise<{ data: BackupData; courses: number }> {
+  version: 1 | 2 = 1,
+): Promise<{ data: ValidatedBackupData; courses: number }> {
   const raw = object(value, 'payload');
   const tables: Record<keyof BackupData, unknown[]> = {
     students: [],
     sessions: [],
     attendance: [],
     scanEvents: [],
+    classTemplates: [],
   };
   for (const name of Object.keys(tables) as (keyof BackupData)[]) {
-    const table = raw[name];
+    const table =
+      name === 'classTemplates' && version === 1 && raw[name] === undefined ? [] : raw[name];
     if (!Array.isArray(table) || table.length > BACKUP_TABLE_LIMIT)
       invalid(
         name,
@@ -236,7 +244,39 @@ export async function validateBackupData(
       );
     tables[name] = table;
   }
-  const data: BackupData = { students: [], sessions: [], attendance: [], scanEvents: [] };
+  if (version === 1 && tables.classTemplates.length)
+    invalid('classTemplates', 'templates require backup version 2');
+  const data: ValidatedBackupData = {
+    students: [],
+    sessions: [],
+    attendance: [],
+    scanEvents: [],
+    classTemplates: [],
+  };
+  const templateIds = new Set<string>();
+  for (const [index, value] of tables.classTemplates.entries()) {
+    const path = `classTemplates[${index}]`,
+      raw = object(value, path);
+    if (Object.keys(raw).some((key) => key !== 'id' && key !== 'encrypted'))
+      invalid(path, 'unexpected fields outside encrypted template data');
+    const row: TemplateRow = {
+      id: text(raw.id, `${path}.id`),
+      encrypted: validateCipher(raw.encrypted, `${path}.encrypted`),
+    };
+    unique(templateIds, row.id, path);
+    const payload = await decoded(
+      keys,
+      row.encrypted,
+      `class-template:${row.id}`,
+      `${path}.encrypted`,
+    );
+    try {
+      validateTemplateData(payload);
+    } catch {
+      invalid(path, 'invalid template name, settings, or timestamps');
+    }
+    data.classTemplates.push(row);
+  }
   // Historical snapshots may differ from today's roster. Cache repeated HMAC checks.
   const tokenCache = new Map<string, Promise<string>>();
   const tokenFor = (context: string) => {

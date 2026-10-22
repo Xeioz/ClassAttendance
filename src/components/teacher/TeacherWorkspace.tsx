@@ -9,6 +9,7 @@ import {
 import { unresolvedDisputes } from '../../domain/audit';
 import { attendanceSummary, readReportSnapshot } from '../../domain/reports';
 import { errorMessage } from '../../utils/errors';
+import { t } from '../../i18n';
 import { enableAudio, feedback } from '../../utils/feedback';
 import type {
   AttendancePrivate,
@@ -47,6 +48,11 @@ export function TeacherWorkspace({
   const [sound, setSound] = useState(false);
   const [query, setQuery] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
+  const [rosterReview, setRosterReview] = useState({
+    pending: false,
+    blockingIssues: 0,
+    changes: 0,
+  });
   const [disputeReviewOpen, setDisputeReviewOpen] = useState(false);
   const scanGeneration = useRef(0);
   const disputeReviewState = useRef(false);
@@ -132,8 +138,15 @@ export function TeacherWorkspace({
       setAttendance(snapshot.attendance);
       setEvents(snapshot.audit);
     } catch (error) {
-      setError(`Saved, but the view could not refresh: ${errorMessage(error)}`);
+      setError(t('workspace.savedRefreshFailed', { error: errorMessage(error) }));
     }
+  }
+  function reviewActiveSession() {
+    const current = sessions.find((item) => item.state === 'ACTIVE');
+    if (!current) return;
+    void refresh(current.id)
+      .then(() => requestAnimationFrame(() => document.getElementById('active-session')?.focus()))
+      .catch((error) => setError(errorMessage(error)));
   }
   async function scan(raw: string) {
     if (!session) return;
@@ -147,7 +160,7 @@ export function TeacherWorkspace({
       await refreshAfterSave();
     } catch (error) {
       if (currentId.current === scanSessionId && generation === scanGeneration.current)
-        setResult({ kind: 'error', title: 'Not saved', detail: errorMessage(error) });
+        setResult({ kind: 'error', title: t('scan.notSaved'), detail: errorMessage(error) });
       feedback(false, sound);
     }
   }
@@ -190,20 +203,34 @@ export function TeacherWorkspace({
     ) ?? [];
   return (
     <div className="mb-5 grid gap-5">
-      <RosterUpload keys={keys} onSaved={refresh} disabled={active || busy || pending} />
-      {!active ? (
+      <RosterUpload
+        keys={keys}
+        onSaved={refresh}
+        disabled={active || busy || pending}
+        onReviewStateChange={setRosterReview}
+      />
+      <details open={!active}>
+        <summary className="mb-3 min-h-12 cursor-pointer rounded-lg px-2 py-3 font-semibold">
+          {t('workspace.preparation')}
+        </summary>
         <SessionForm
           keys={keys}
           sections={[...new Set(students.map((item) => item.section))].sort()}
+          students={students}
+          activeSession={sessions.find((item) => item.state === 'ACTIVE')}
+          rosterReviewPending={rosterReview.pending}
+          rosterReviewIssues={rosterReview.blockingIssues}
+          onRosterChanged={refresh}
+          onReviewActiveSession={reviewActiveSession}
           onCreated={async (created) => {
             setResult(undefined);
             await refresh(created.id);
           }}
         />
-      ) : null}
+      </details>
       {sessions.length ? (
         <label className="max-w-lg">
-          Session history
+          {t('workspace.history')}
           <select
             value={selectedId}
             disabled={busy || pending || manualOpen || disputeReviewOpen}
@@ -218,8 +245,12 @@ export function TeacherWorkspace({
           >
             {sessions.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.course} · {item.section} · {new Date(item.startsAt).toLocaleString()} ·{' '}
-                {item.state}
+                {t('workspace.historyOption', {
+                  course: item.course,
+                  section: item.section,
+                  time: new Date(item.startsAt).toLocaleString(),
+                  state: t(`session.${item.state}`),
+                })}
               </option>
             ))}
           </select>
@@ -227,13 +258,11 @@ export function TeacherWorkspace({
       ) : null}
       {session && summary ? (
         <>
-          <section className="card">
+          <section className="card" id="active-session" tabIndex={-1}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="eyebrow">
-                  {session.state === 'CLOSED'
-                    ? 'Closed / reconciled · read only'
-                    : 'Active session'}
+                  {session.state === 'CLOSED' ? t('workspace.closed') : t('workspace.active')}
                 </p>
                 <h2 className="mt-2 text-2xl">
                   {session.course}{' '}
@@ -245,20 +274,21 @@ export function TeacherWorkspace({
                   {session.room ? ` · ${session.room}` : ''}
                 </p>
                 <p className="mt-2 text-sm">
-                  Room challenge: <strong className="font-mono text-lg">{session.roomPin}</strong> ·{' '}
-                  {session.graceMinutes} minute grace
+                  {t('workspace.challenge')}{' '}
+                  <strong className="font-mono text-lg">{session.roomPin}</strong> ·{' '}
+                  {t('workspace.grace', { minutes: session.graceMinutes })}
                 </p>
               </div>
               <ExportModal keys={keys} session={session} auditCount={events.length} />
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-6">
               {[
-                ['Enrolled', summary.total],
-                ['Present', summary.counts.PRESENT],
-                ['Late', summary.counts.LATE],
-                ['Not yet recorded', summary.counts.PENDING],
-                ['Absent', summary.counts.ABSENT],
-                ['Excused', summary.counts.EXCUSED],
+                [t('workspace.enrolled'), summary.total],
+                [t('workspace.present'), summary.counts.PRESENT],
+                [t('workspace.late'), summary.counts.LATE],
+                [t('manual.notRecorded'), summary.counts.PENDING],
+                [t('workspace.absent'), summary.counts.ABSENT],
+                [t('workspace.excused'), summary.counts.EXCUSED],
               ].map(([label, value]) => (
                 <div className="rounded-xl bg-paper p-4" key={label}>
                   <p className="text-xs font-semibold text-slate-600">{label}</p>
@@ -267,24 +297,25 @@ export function TeacherWorkspace({
               ))}
             </div>
             <p className="mt-4 text-sm">
-              Attendance rate: {(summary.rate * 100).toFixed(1)}% (present + late / enrolled).{' '}
-              {pendingDisputes} unresolved disputes.
+              {t('workspace.rate', {
+                rate: (summary.rate * 100).toFixed(1),
+                disputes: pendingDisputes,
+              })}
             </p>
           </section>
           {session.state === 'ACTIVE' ? (
             <section className="card grid gap-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-xl">Record attendance</h2>
+                <h2 className="text-xl">{t('workspace.record')}</h2>
                 <button
                   className="secondary"
                   disabled={pending || busy || disputeReviewOpen}
                   onClick={() => setManualOpen(true)}
                 >
-                  Manual check-in / correction (F2)
+                  {t('workspace.manual')}
                 </button>
               </div>
-              <AccessibleHUD result={result} />
-              {pending ? <p role="status">Saving scan…</p> : null}
+              <AccessibleHUD result={result} processing={pending} />
               <button
                 className="secondary justify-self-start"
                 aria-pressed={sound}
@@ -296,7 +327,7 @@ export function TeacherWorkspace({
                       .catch((error) => setError(errorMessage(error)));
                 }}
               >
-                Sound {sound ? 'on · mute' : 'off · enable'}
+                {sound ? t('workspace.soundOn') : t('workspace.soundOff')}
               </button>
               <ScannerView
                 key={session.id}
@@ -304,17 +335,12 @@ export function TeacherWorkspace({
                 onPending={setPending}
                 paused={manualOpen || disputeReviewOpen}
               />
-              {manualOpen ? (
-                <p className="text-sm">Camera paused while manual attendance is open.</p>
-              ) : null}
+              {manualOpen ? <p className="text-sm">{t('workspace.manualPaused')}</p> : null}
             </section>
           ) : (
             <section className="card">
-              <h2 className="text-xl">Reopen for attendance changes</h2>
-              <p className="my-3 text-sm text-slate-600">
-                Reopening preserves recorded attendance and returns automatic closure absences to
-                not yet recorded. The reason enters the audit trail.
-              </p>
+              <h2 className="text-xl">{t('workspace.reopenTitle')}</h2>
+              <p className="my-3 text-sm text-slate-600">{t('workspace.reopenDescription')}</p>
               <form
                 className="grid gap-3"
                 onSubmit={(event) => {
@@ -323,7 +349,7 @@ export function TeacherWorkspace({
                 }}
               >
                 <label>
-                  Reason to reopen
+                  {t('workspace.reopenReason')}
                   <textarea
                     value={reopenReason}
                     onChange={(event) => setReopenReason(event.target.value)}
@@ -333,7 +359,7 @@ export function TeacherWorkspace({
                   />
                 </label>
                 <button className="secondary justify-self-start" disabled={busy || active}>
-                  Reopen session
+                  {t('workspace.reopen')}
                 </button>
               </form>
             </section>
@@ -349,25 +375,30 @@ export function TeacherWorkspace({
           />
           <section className="card">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <h2 className="text-xl">Attendance roster</h2>
+              <h2 className="text-xl">{t('workspace.roster')}</h2>
               <label>
-                Search roster
+                {t('workspace.search')}
                 <input
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Name or student ID"
+                  placeholder={t('workspace.searchPlaceholder')}
                 />
               </label>
             </div>
             <div className="mt-4 overflow-auto">
               <table className="w-full text-left text-sm">
-                <caption className="sr-only">Attendance for selected session</caption>
+                <caption className="sr-only">{t('workspace.caption')}</caption>
                 <thead>
                   <tr>
-                    {['Student ID', 'Official name', 'Status', 'First recorded'].map((label) => (
-                      <th key={label} className="p-3">
-                        {label}
+                    {[
+                      'student.id',
+                      'workspace.officialName',
+                      'manual.status',
+                      'workspace.firstRecorded',
+                    ].map((label) => (
+                      <th scope="col" key={label} className="p-3">
+                        {t(label)}
                       </th>
                     ))}
                   </tr>
@@ -381,7 +412,9 @@ export function TeacherWorkspace({
                           {student.displayId ?? student.id}
                         </td>
                         <td className="p-3">{student.name}</td>
-                        <td className="p-3 font-semibold">{entry?.status ?? 'Not yet recorded'}</td>
+                        <td className="p-3 font-semibold">
+                          {entry ? t(`status.${entry.status}`) : t('manual.notRecorded')}
+                        </td>
                         <td className="p-3">
                           {entry && entry.status !== 'ABSENT'
                             ? new Date(entry.originalAt ?? entry.at).toLocaleTimeString()
@@ -402,7 +435,7 @@ export function TeacherWorkspace({
                     checked={confirmClose}
                     onChange={(event) => setConfirmClose(event.target.checked)}
                   />
-                  Mark unrecorded students absent and close the session
+                  {t('workspace.closeConfirm')}
                 </label>
                 <button
                   className="secondary mt-3"
@@ -411,7 +444,7 @@ export function TeacherWorkspace({
                   }
                   onClick={() => void finish()}
                 >
-                  Close attendance session
+                  {t('workspace.close')}
                 </button>
               </div>
             ) : null}

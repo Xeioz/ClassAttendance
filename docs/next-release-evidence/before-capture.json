@@ -1,0 +1,9 @@
+{
+  "baselineCommit": "3c07af58b62e4c8a6272465826729b3805518c2e",
+  "source": "Existing production dist from baseline before next-release rebuild",
+  "syntheticData": true,
+  "screens": [
+    "session-preparation.png",
+    "roster-review.png"
+  ]
+}

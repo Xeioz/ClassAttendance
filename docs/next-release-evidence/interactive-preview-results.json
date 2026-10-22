@@ -1,0 +1,39 @@
+{
+  "artifact": "/workspace/attendance-preview/build/AttendanceDesk-Interactive-Preview.html",
+  "browser": "Headless system Chromium",
+  "modes": [
+    {
+      "mode": "served-html",
+      "passed": true,
+      "checks": [
+        "Actual application opens unlocked with 45 synthetic students, two seeded templates, and expanded preparation.",
+        "Create, update, select, independent duplicate, cancel removal, and confirmed removal work while the existing session stays unchanged. Future-section templates are supported.",
+        "Readiness explicitly reports temporary memory, unavailable service-worker preparation, unknown second-device recovery, and active-session blocking.",
+        "Excel and CSV include all 45 students while display is filtered. Reopened XLSX preserves text IDs, wrapping, and frozen headers. Backup remains encrypted; readiness records a download request without claiming verified recovery.",
+        "Downloaded versioned backup restores 45 students, attendance, and all three saved templates into an empty workspace; unlock refreshes without reload and restored template edits match.",
+        "Complete roster review paginates 46 rows, shows before/after, requires identity approval, and cancels without writes. Filtered save commits exactly one addition and one update; historical session remains 45 original students. Explicit template session uses current 46-student roster and exports 46 rows.",
+        "Reset restores exactly the two seeded templates and 45 synthetic students; all preview edits are temporary."
+      ]
+    },
+    {
+      "mode": "sandbox-with-forms",
+      "passed": true,
+      "checks": [
+        "Actual application opens unlocked with 45 synthetic students, two seeded templates, and expanded preparation.",
+        "Create, update, select, independent duplicate, cancel removal, and confirmed removal work while the existing session stays unchanged. Future-section templates are supported.",
+        "Readiness explicitly reports temporary memory, unavailable service-worker preparation, unknown second-device recovery, and active-session blocking.",
+        "Excel and CSV include all 45 students while display is filtered. Reopened XLSX preserves text IDs, wrapping, and frozen headers. Backup remains encrypted; readiness records a download request without claiming verified recovery.",
+        "Downloaded versioned backup restores 45 students, attendance, and all three saved templates into an empty workspace; unlock refreshes without reload and restored template edits match.",
+        "Complete roster review paginates 46 rows, shows before/after, requires identity approval, and cancels without writes. Filtered save commits exactly one addition and one update; historical session remains 45 original students. Explicit template session uses current 46-student roster and exports 46 rows.",
+        "Reset restores exactly the two seeded templates and 45 synthetic students; all preview edits are temporary."
+      ]
+    }
+  ],
+  "browserErrors": [],
+  "externalRequests": [],
+  "unexpectedResourceRequests": [],
+  "syntheticData": true,
+  "actualCodexPreviewPanelVerified": false,
+  "fileNavigationAttempted": false,
+  "note": "HTTP served and opaque sandbox allow-forms behavior tested. Codex panel availability and physical-device recovery remain unverified."
+}

@@ -1,4 +1,5 @@
 import type { ScanResult } from '../../types';
+import { t } from '../../i18n';
 
 const styles = {
   valid: 'border-emerald-800 bg-emerald-50 text-emerald-950',
@@ -6,13 +7,20 @@ const styles = {
   unknown: 'border-amber-700 bg-amber-50 text-amber-950',
   error: 'border-red-800 bg-red-50 text-red-950',
 };
-export function AccessibleHUD({ result }: { result?: ScanResult }) {
+export function AccessibleHUD({
+  result,
+  processing = false,
+}: {
+  result?: ScanResult;
+  processing?: boolean;
+}) {
+  const displayedResult = processing ? undefined : result;
   return (
     <div
       role="status"
       aria-live="polite"
       aria-atomic="true"
-      className={`flex min-h-28 items-start gap-4 rounded-xl border-2 p-4 ${result ? styles[result.kind] : 'border-slate-200 bg-slate-50'}`}
+      className={`flex min-h-28 items-start gap-4 rounded-xl border-2 p-4 ${displayedResult ? styles[displayedResult.kind] : 'border-slate-200 bg-slate-50'}`}
     >
       <svg
         viewBox="0 0 24 24"
@@ -25,19 +33,24 @@ export function AccessibleHUD({ result }: { result?: ScanResult }) {
         className="shrink-0"
       >
         <circle cx="12" cy="12" r="10" />
-        {result?.kind === 'valid' ? (
+        {displayedResult?.kind === 'valid' ? (
           <path d="m7 12 3 3 7-7" />
-        ) : result?.kind === 'duplicate' ? (
+        ) : displayedResult?.kind === 'duplicate' || displayedResult?.kind === 'unknown' ? (
           <path d="M12 7v6m0 3v1" />
-        ) : (
+        ) : displayedResult?.kind === 'error' ? (
           <path d="m8 8 8 8m0-8-8 8" />
+        ) : (
+          <path d="M12 6v6l4 2" />
         )}
       </svg>
-      <div>
-        <p className="font-semibold">{result?.title ?? 'Ready for attendance'}</p>
+      <div className="min-w-0">
+        <p className="font-semibold">
+          {processing ? t('hud.processing') : (displayedResult?.title ?? t('hud.ready'))}
+        </p>
         <p className="mt-1 break-words text-sm">
-          {result?.detail ??
-            'Verify the student presenting the pass. A QR code alone does not prove identity.'}
+          {processing
+            ? t('hud.processingDetail')
+            : (displayedResult?.detail ?? t('hud.readyDetail'))}
         </p>
       </div>
     </div>

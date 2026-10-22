@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { flagDispute, resolveDispute, unresolvedDisputes } from '../../domain/audit';
 import { errorMessage } from '../../utils/errors';
+import { t } from '../../i18n';
 import type { AuditEntry, ScanResult, Session, VaultKeys } from '../../types';
 
 interface DisputeDraft {
@@ -105,7 +106,7 @@ export function DisputePanel({
       await onChanged();
     } catch (error) {
       if (ticket === operation.current)
-        setError(`Dispute saved, but the view could not refresh: ${errorMessage(error)}`);
+        setError(t('dispute.savedRefreshFailed', { error: errorMessage(error) }));
     } finally {
       if (ticket === operation.current) setBusy(false);
     }
@@ -113,27 +114,25 @@ export function DisputePanel({
   return (
     <section className="card">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl">Dispute review</h2>
-        <p className="text-sm font-semibold">{pending.length} unresolved</p>
+        <h2 className="text-xl">{t('dispute.title')}</h2>
+        <p className="text-sm font-semibold">{t('dispute.count', { count: pending.length })}</p>
       </div>
-      <p className="my-3 text-sm text-slate-600">
-        A duplicate alone is not misconduct. Check the student’s identity. Flagging preserves
-        attendance and both presentation times.
-      </p>
+      <p className="my-3 text-sm text-slate-600">{t('dispute.description')}</p>
       {currentDraft ? (
         <div className="mb-4 grid gap-3 border-b pb-4">
-          <p className="text-sm font-semibold">Reviewing {currentDraft.name}</p>
+          <p className="text-sm font-semibold">
+            {t('dispute.reviewing', { name: currentDraft.name })}
+          </p>
           <p role="status" className="notice">
-            Camera paused for this review. A scan already being saved may finish; this review stays
-            attached to the student and times shown below. Cancel or save to resume.
+            {t('dispute.paused')}
           </p>
           <p className="text-sm">
-            First presentation: {new Date(currentDraft.firstAt).toLocaleString()}
+            {t('dispute.first', { time: new Date(currentDraft.firstAt).toLocaleString() })}
             <br />
-            Second presentation: {new Date(currentDraft.secondAt).toLocaleString()}
+            {t('dispute.second', { time: new Date(currentDraft.secondAt).toLocaleString() })}
           </p>
           <label>
-            Reason for disputing this check-in
+            {t('dispute.reason')}
             <textarea
               value={currentDraft.reason}
               onChange={(event) => setDraft({ ...currentDraft, reason: event.target.value })}
@@ -152,10 +151,10 @@ export function DisputePanel({
               }
               onClick={() => void flag()}
             >
-              {busy ? 'Saving dispute…' : 'Flag disputed check-in'}
+              {busy ? t('dispute.saving') : t('dispute.flag')}
             </button>
             <button className="secondary" disabled={busy} onClick={cancelReview}>
-              Cancel dispute review
+              {t('dispute.cancel')}
             </button>
           </div>
         </div>
@@ -169,12 +168,12 @@ export function DisputePanel({
             }
             onClick={beginReview}
           >
-            Review duplicate check-in
+            {t('dispute.review')}
           </button>
         </div>
       ) : null}
       {!pending.length ? (
-        <p className="text-sm text-slate-600">No unresolved disputes.</p>
+        <p className="text-sm text-slate-600">{t('dispute.empty')}</p>
       ) : (
         pending.map((event) => (
           <DisputeRow
@@ -183,7 +182,7 @@ export function DisputePanel({
             name={
               session.roster.find((student) => student.token === event.studentToken)?.name ??
               event.studentId ??
-              'Student'
+              t('audit.student')
             }
             disabled={session.state !== 'ACTIVE' || Boolean(currentDraft)}
             resolve={async (reason) => {
@@ -230,14 +229,17 @@ function DisputeRow({
     >
       <p className="font-semibold">{name}</p>
       <p className="text-sm">
-        First presentation: {event.firstAt ? new Date(event.firstAt).toLocaleString() : 'Unknown'}
+        {t('dispute.first', {
+          time: event.firstAt ? new Date(event.firstAt).toLocaleString() : t('dispute.unknown'),
+        })}
         <br />
-        Second presentation:{' '}
-        {event.secondAt ? new Date(event.secondAt).toLocaleString() : 'Unknown'}
+        {t('dispute.second', {
+          time: event.secondAt ? new Date(event.secondAt).toLocaleString() : t('dispute.unknown'),
+        })}
       </p>
       <p className="text-sm">{event.reason}</p>
       <label>
-        Resolution and identity-check outcome
+        {t('dispute.resolution')}
         <textarea
           value={reason}
           onChange={(input) => setReason(input.target.value)}
@@ -247,12 +249,9 @@ function DisputeRow({
           disabled={disabled || busy}
         />
       </label>
-      <p className="text-xs">
-        Resolving the review keeps the attendance status. Use manual correction separately if
-        needed.
-      </p>
+      <p className="text-xs">{t('dispute.resolutionHint')}</p>
       <button className="secondary justify-self-start" disabled={disabled || busy}>
-        Resolve dispute
+        {t('dispute.resolve')}
       </button>
       {error ? <p role="alert">{error}</p> : null}
     </form>

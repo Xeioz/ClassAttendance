@@ -1,0 +1,55 @@
+$ vitest run
+
+ RUN  v3.2.4 /workspace/ClassAttendance
+
+ ✓ tests/roster-change.test.ts (13 tests) 1027ms
+ ✓ tests/attendance.test.ts (8 tests) 946ms
+ ✓ tests/templates-data.test.ts (28 tests) 2986ms
+ ✓ tests/phase3.test.ts (4 tests) 496ms
+ ✓ tests/excel.test.ts (4 tests) 435ms
+ ✓ tests/crypto.test.ts (3 tests) 306ms
+ ✓ tests/domain.test.ts (9 tests) 12ms
+ ✓ tests/fieldMetrics.test.ts (2 tests) 10ms
+ ✓ tests/templates-ui.test.tsx (8 tests) 3331ms
+   ✓ class templates and reviewed session creation > lets a fresh vault save a future-section template before a roster import and canonicalizes section suggestions  666ms
+   ✓ class templates and reviewed session creation > persists a template across an offline remount and explicitly starts with current roster and fresh session values  398ms
+   ✓ class templates and reviewed session creation > edits and independently duplicates templates during an active session; keyboard-confirmed removal preserves the session  494ms
+   ✓ class templates and reviewed session creation > uses associated, focused field errors for keyboard session submission and template validation  515ms
+   ✓ class templates and reviewed session creation > keeps an unavailable template section visible and blocks a pending import without blocking template edits  313ms
+   ✓ class templates and reviewed session creation > refreshes stale reviewed roster data and requires another explicit start after a concurrent update  499ms
+ ✓ tests/localization-a11y.test.tsx (7 tests) 3027ms
+   ✓ offline localization fallback > keeps long display translations and canonical attendance values separate during a real save  633ms
+   ✓ accessible feedback and validation > reviews and focuses the active session when history currently shows a closed session  1496ms
+   ✓ accessible feedback and validation > associates invalid manual fields, focuses them, and cancels without writing attendance  360ms
+ ✓ tests/backup-validation.test.ts (36 tests) 10787ms
+   ✓ backup schema validation before replacement > rejects an authenticated object-valued reason before replacing any table and keeps the workspace unlockable  379ms
+   ✓ backup schema validation before replacement > rejects duplicate primary keys, wrong roster relationships and conflicting active sessions  650ms
+   ✓ backup schema validation before replacement > rejects invalid HMAC identity relationships and malformed payload roots  523ms
+   ✓ backup schema validation before replacement > preserves every table and metadata for wrong PIN, invalid ciphertext, and write failure  520ms
+   ✓ backup schema validation before replacement > rejects cross-action fields that would misattribute lifecycle history  589ms
+   ✓ current and legacy recovery compatibility > restores current history including legitimate unlisted scans and completed disputes  1329ms
+   ✓ current and legacy recovery compatibility > restores all original v1 event structures, epoch-zero timestamps, optional legacy metadata and historical rosters  401ms
+   ✓ current and legacy recovery compatibility > rejects malformed legacy nested prior attendance without deleting current records  389ms
+   ✓ current and legacy recovery compatibility > rejects legacy aliases that would override the validated event identity or status  364ms
+ ✓ tests/teacher-ui.test.tsx (1 test) 1559ms
+   ✓ teacher interface workflow > opens F2 manual dialog, saves excusal, closes read-only, and reopens with a reason  1558ms
+ ✓ tests/restore-search-ui.test.tsx (5 tests) 1554ms
+   ✓ restore interface regression > refreshes a fresh portal immediately and unlocks restored records without navigation  609ms
+   ✓ restore interface regression > preserves existing unlock mode and data after a wrong-PIN restore  417ms
+   ✓ restore interface regression > clears an earlier success when another restore fails  308ms
+ ✓ tests/dispute-ui.test.tsx (7 tests) 1541ms
+   ✓ stable duplicate dispute review > keeps a fast first scan when the newly mounted dispute panel reports its idle state  522ms
+   ✓ stable duplicate dispute review > pauses the workspace scanner and discards a pre-review in-flight result after cancellation  564ms
+ ✓ tests/roster-change-ui.test.tsx (4 tests) 817ms
+   ✓ roster change review controls > shows before/after values, blocks unapproved updates, and saves all rows despite filters  349ms
+ ✓ tests/readiness-ui.test.tsx (10 tests) 890ms
+   ✓ pre-class readiness workflow > updates class, roster preview, and active-session blockers independently from device advice  335ms
+ ✓ tests/readiness-backup.test.tsx (4 tests) 759ms
+ ✓ tests/readiness.test.ts (13 tests) 49ms
+ ✓ tests/roster-preview.test.tsx (2 tests) 561ms
+   ✓ complete roster preview > lets teachers inspect every row and search displayed/canonical IDs without narrowing the merge  476ms
+
+ Test Files  19 passed (19)
+      Tests  168 passed (168)
+   Start at  11:12:46
+   Duration  17.92s (transform 2.31s, setup 0ms, collect 7.39s, tests 31.09s, environment 5.67s, prepare 2.52s)

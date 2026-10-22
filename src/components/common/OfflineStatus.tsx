@@ -1,18 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { errorMessage } from '../../utils/errors';
 import { db } from '../../db/db';
+import { t } from '../../i18n';
+import {
+  getOfflineEvidence,
+  recordOfflineFailure,
+  refreshOfflineEvidence,
+  subscribeOfflineEvidence,
+} from '../../domain/readiness';
 
 export function OfflineStatus({ active }: { active: boolean }) {
   const [online, setOnline] = useState(navigator.onLine);
-  const [verified, setVerified] = useState(false);
-  const [message, setMessage] = useState('Offline resources have not been verified.');
+  const evidence = useSyncExternalStore(
+    subscribeOfflineEvidence,
+    getOfflineEvidence,
+    getOfflineEvidence,
+  );
+  const [updateMessage, setUpdateMessage] = useState('');
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisterError(error) {
-      setMessage(`Offline caching unavailable: ${errorMessage(error)}`);
+      recordOfflineFailure(
+        t('readiness.offline.registrationFailed', { reason: errorMessage(error) }),
+      );
     },
   });
   useEffect(() => {
@@ -24,67 +37,52 @@ export function OfflineStatus({ active }: { active: boolean }) {
       window.removeEventListener('offline', sync);
     };
   }, []);
-  async function check() {
-    try {
-      if (!('serviceWorker' in navigator) || !('caches' in window))
-        throw new Error('This browser does not support offline website storage.');
-      const registration = await navigator.serviceWorker.getRegistration();
-      if (!registration?.active)
-        throw new Error(
-          'Offline cache is not active. Use the production build, wait for caching, and reload.',
-        );
-      // Workbox adds revision query parameters to precache keys.
-      const resourceBase = new URL(import.meta.env.BASE_URL, location.origin);
-      const response = await caches.match(new URL('offline-assets.json', resourceBase), {
-        ignoreSearch: true,
-      });
-      if (!response) throw new Error('Offline asset checklist is not cached yet.');
-      const files = (await response.json()) as string[];
-      const matches = await Promise.all(
-        files.map((file) => caches.match(new URL(file, resourceBase), { ignoreSearch: true })),
-      );
-      if (!matches.every(Boolean))
-        throw new Error(
-          'Some required resources are not cached. Reconnect and refresh before class.',
-        );
-      setVerified(true);
-      setMessage(
-        'Required website resources cached. Test a cold offline launch before class. Browser data can still be cleared.',
-      );
-    } catch (error) {
-      setVerified(false);
-      setMessage(errorMessage(error));
-    }
-  }
   async function applyUpdate() {
     try {
       if (active || (await db.sessions.where('state').equals('ACTIVE').count()))
-        throw new Error('Close the active attendance session before applying a website update.');
+        throw new Error(t('readiness.offline.closeSession'));
       await updateServiceWorker(true);
     } catch (error) {
-      setMessage(errorMessage(error));
+      setUpdateMessage(errorMessage(error));
     }
   }
   return (
     <aside className="mb-7 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p>
-          <strong>{online ? 'Network available' : 'Offline'}</strong> ·{' '}
-          {verified ? 'Cache checked' : 'Cache not checked'}
+          <strong>{t(online ? 'readiness.offline.online' : 'readiness.offline.offline')}</strong> ·{' '}
+          {t(
+            evidence.state === 'ready'
+              ? 'readiness.offline.checked'
+              : 'readiness.offline.notChecked',
+          )}
         </p>
         <div className="flex flex-wrap gap-2">
-          <button className="secondary" onClick={() => void check()}>
-            Check offline readiness
+          <button
+            type="button"
+            className="secondary"
+            disabled={evidence.checking}
+            onClick={() => {
+              setUpdateMessage('');
+              void refreshOfflineEvidence();
+            }}
+          >
+            {t(evidence.checking ? 'readiness.refreshing' : 'readiness.offline.check')}
           </button>
           {needRefresh ? (
-            <button className="secondary" disabled={active} onClick={() => void applyUpdate()}>
-              {active ? 'Update waits for session closure' : 'Apply website update'}
+            <button
+              type="button"
+              className="secondary"
+              disabled={active}
+              onClick={() => void applyUpdate()}
+            >
+              {t(active ? 'readiness.offline.updateBlocked' : 'readiness.offline.update')}
             </button>
           ) : null}
         </div>
       </div>
       <p role="status" className="mt-2 text-xs text-slate-600">
-        {message}
+        {updateMessage || evidence.message || t('readiness.offline.initial')}
       </p>
     </aside>
   );
