@@ -1,0 +1,104 @@
+{
+  "node": "v24.19.0",
+  "platform": "linux",
+  "syntheticData": true,
+  "timingScope": "One run per size: serialization only; excludes database reads, browser download and validation; no performance acceptance target.",
+  "results": [
+    {
+      "records": 0,
+      "auditEvents": 0,
+      "exactAttendanceValues": true,
+      "exactAuditValues": true,
+      "exactCSVValues": true,
+      "identifierTypes": "text",
+      "formulasIntroduced": false,
+      "freezeRows": 1,
+      "attendanceFrozenColumns": 2,
+      "wrappedNamesAndReasons": true,
+      "explicitRowHeights": true,
+      "filters": true,
+      "percentageFormats": true,
+      "readers": [
+        "SheetJS",
+        "ExcelJS"
+      ],
+      "desktopVisualVerification": "Not tested",
+      "xlsxBytes": 10994,
+      "csvBytes": 175,
+      "xlsxGenerationMs": 64.36017999999967,
+      "csvGenerationMs": 0.7686429999998836
+    },
+    {
+      "records": 1,
+      "auditEvents": 1,
+      "exactAttendanceValues": true,
+      "exactAuditValues": true,
+      "exactCSVValues": true,
+      "identifierTypes": "text",
+      "formulasIntroduced": false,
+      "freezeRows": 1,
+      "attendanceFrozenColumns": 2,
+      "wrappedNamesAndReasons": true,
+      "explicitRowHeights": true,
+      "filters": true,
+      "percentageFormats": true,
+      "readers": [
+        "SheetJS",
+        "ExcelJS"
+      ],
+      "desktopVisualVerification": "Not tested",
+      "xlsxBytes": 11268,
+      "csvBytes": 853,
+      "xlsxGenerationMs": 39.359492000000046,
+      "csvGenerationMs": 0.5991680000001907
+    },
+    {
+      "records": 45,
+      "auditEvents": 45,
+      "exactAttendanceValues": true,
+      "exactAuditValues": true,
+      "exactCSVValues": true,
+      "identifierTypes": "text",
+      "formulasIntroduced": false,
+      "freezeRows": 1,
+      "attendanceFrozenColumns": 2,
+      "wrappedNamesAndReasons": true,
+      "explicitRowHeights": true,
+      "filters": true,
+      "percentageFormats": true,
+      "readers": [
+        "SheetJS",
+        "ExcelJS"
+      ],
+      "desktopVisualVerification": "Not tested",
+      "xlsxBytes": 15828,
+      "csvBytes": 15503,
+      "xlsxGenerationMs": 31.229027999999744,
+      "csvGenerationMs": 5.01138200000014
+    },
+    {
+      "records": 10000,
+      "auditEvents": 10000,
+      "exactAttendanceValues": true,
+      "exactAuditValues": true,
+      "exactCSVValues": true,
+      "identifierTypes": "text",
+      "formulasIntroduced": false,
+      "freezeRows": 1,
+      "attendanceFrozenColumns": 2,
+      "wrappedNamesAndReasons": true,
+      "explicitRowHeights": true,
+      "filters": true,
+      "percentageFormats": true,
+      "readers": [
+        "SheetJS",
+        "ExcelJS"
+      ],
+      "desktopVisualVerification": "Not tested",
+      "xlsxBytes": 885234,
+      "csvBytes": 3442574,
+      "xlsxGenerationMs": 2866.9871859999994,
+      "csvGenerationMs": 723.1661710000008
+    }
+  ]
+}

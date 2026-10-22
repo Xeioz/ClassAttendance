@@ -1,0 +1,41 @@
+{
+  "syntheticData": true,
+  "results": [
+    {
+      "records": 0,
+      "auditEvents": 0,
+      "allValuesAndMembershipReconciled": true,
+      "textTypesAndFormulaSafety": true,
+      "freezeWrapHeightsFiltersAndFormatsPersisted": true,
+      "reader": "openpyxl 3.1.5",
+      "desktopVisualVerification": "Not tested"
+    },
+    {
+      "records": 1,
+      "auditEvents": 1,
+      "allValuesAndMembershipReconciled": true,
+      "textTypesAndFormulaSafety": true,
+      "freezeWrapHeightsFiltersAndFormatsPersisted": true,
+      "reader": "openpyxl 3.1.5",
+      "desktopVisualVerification": "Not tested"
+    },
+    {
+      "records": 45,
+      "auditEvents": 45,
+      "allValuesAndMembershipReconciled": true,
+      "textTypesAndFormulaSafety": true,
+      "freezeWrapHeightsFiltersAndFormatsPersisted": true,
+      "reader": "openpyxl 3.1.5",
+      "desktopVisualVerification": "Not tested"
+    },
+    {
+      "records": 10000,
+      "auditEvents": 10000,
+      "allValuesAndMembershipReconciled": true,
+      "textTypesAndFormulaSafety": true,
+      "freezeWrapHeightsFiltersAndFormatsPersisted": true,
+      "reader": "openpyxl 3.1.5",
+      "desktopVisualVerification": "Not tested"
+    }
+  ]
+}

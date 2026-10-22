@@ -1,0 +1,155 @@
+{
+  "browser": "Headless system Chromium",
+  "results": [
+    {
+      "name": "Production page and student QR generation",
+      "result": "Passed",
+      "durationMs": 472,
+      "detail": {
+        "normalizedId": "2024001",
+        "canvasCount": 1
+      }
+    },
+    {
+      "name": "Mobile horizontal overflow assertion",
+      "result": "Passed",
+      "detail": {
+        "viewport": 375,
+        "documentWidth": 375,
+        "canvas": {
+          "x": 41,
+          "y": 636,
+          "width": 293,
+          "height": 293,
+          "top": 636,
+          "right": 334,
+          "bottom": 929,
+          "left": 41
+        }
+      }
+    },
+    {
+      "name": "Mobile layout measurement at 375px",
+      "result": "Passed",
+      "durationMs": 80,
+      "detail": {
+        "viewport": 375,
+        "documentWidth": 375,
+        "canvas": {
+          "x": 41,
+          "y": 636,
+          "width": 293,
+          "height": 293,
+          "top": 636,
+          "right": 334,
+          "bottom": 929,
+          "left": 41
+        }
+      }
+    },
+    {
+      "name": "Create encrypted teacher workspace and import three synthetic students",
+      "result": "Passed",
+      "durationMs": 283
+    },
+    {
+      "name": "Create session, keyboard manual entry, and closure",
+      "result": "Passed",
+      "durationMs": 475,
+      "detail": {
+        "rows": [
+          "002QA JoséABSENT—",
+          "00-1QA AliceEXCUSED3:11:59 AM",
+          "003QA CarolABSENT—"
+        ]
+      }
+    },
+    {
+      "name": "Filtered UI exports complete selected session; real XLSX and CSV downloads",
+      "result": "Passed",
+      "durationMs": 590,
+      "detail": {
+        "displayedRows": 1,
+        "exportedStudentIds": [
+          "00-1",
+          "002",
+          "003"
+        ]
+      }
+    },
+    {
+      "name": "Encrypted backup download",
+      "result": "Passed",
+      "durationMs": 86,
+      "detail": {
+        "bytes": 4937,
+        "plaintextNameAbsent": true
+      }
+    },
+    {
+      "name": "Reopen preserves excusal and clears automatic absences; Escape closes manual dialog",
+      "result": "Passed",
+      "durationMs": 291,
+      "detail": {
+        "rows": [
+          "002QA JoséNot yet recorded—",
+          "00-1QA AliceEXCUSED3:11:59 AM",
+          "003QA CarolNot yet recorded—"
+        ]
+      }
+    },
+    {
+      "name": "Browser duplicate review pauses and cancellation clears the draft",
+      "result": "Passed",
+      "durationMs": 508
+    },
+    {
+      "name": "Displayed and canonical ID searches find the same audit event in the browser",
+      "result": "Passed",
+      "durationMs": 324,
+      "detail": {
+        "displayed": 2,
+        "canonical": 2
+      }
+    },
+    {
+      "name": "Wrong PIN preserves lock; correct PIN unlocks",
+      "result": "Passed",
+      "durationMs": 409
+    },
+    {
+      "name": "Production service worker readiness and offline reload",
+      "result": "Passed",
+      "durationMs": 428,
+      "detail": {
+        "offlineReload": true,
+        "coldBrowserRestart": false
+      }
+    },
+    {
+      "name": "Restore updates unlock form state",
+      "result": "Passed",
+      "detail": {
+        "confirmationStillVisible": false,
+        "createButtonStillVisible": false
+      }
+    },
+    {
+      "name": "Restore actual downloaded backup in separate clean browser context",
+      "result": "Passed",
+      "durationMs": 1898,
+      "detail": {
+        "restoredRows": [
+          "002QA JoséABSENT—",
+          "00-1QA AliceEXCUSED10:11:59 AM",
+          "003QA CarolABSENT—"
+        ],
+        "state": {
+          "confirmationStillVisible": false,
+          "createButtonStillVisible": false
+        }
+      }
+    }
+  ],
+  "uncaughtPageErrors": []
+}

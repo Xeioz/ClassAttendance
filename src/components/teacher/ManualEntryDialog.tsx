@@ -36,7 +36,9 @@ export function ManualEntryDialog({
     return () => element?.close();
   }, []);
   const matches = session.roster.filter((student) =>
-    `${student.id} ${student.name}`.toLowerCase().includes(query.toLowerCase()),
+    `${student.displayId ?? ''} ${student.id} ${student.name}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
   );
   const selected = session.roster.find((student) => student.token === studentToken);
   async function save(event: FormEvent) {

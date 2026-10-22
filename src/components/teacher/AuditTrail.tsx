@@ -1,18 +1,31 @@
 import { useState } from 'react';
 import type { AuditEntry, Session } from '../../types';
+import { normalizeId } from '../../utils/normalize';
 
 export function AuditTrail({ events, session }: { events: AuditEntry[]; session: Session }) {
   const [query, setQuery] = useState('');
   const [action, setAction] = useState('');
-  const filtered = [...events]
-    .reverse()
-    .filter(
-      (event) =>
-        (!action || event.action === action) &&
-        `${event.studentId ?? ''} ${session.roster.find((student) => student.token === event.studentToken)?.name ?? ''} ${event.reason ?? ''}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
+  const searchText = query.trim().toLowerCase();
+  let searchId: string | undefined;
+  if (searchText) {
+    try {
+      searchId = normalizeId(query);
+    } catch {
+      // Names/reasons need not follow the ID grammar. An invalid/empty ID must not match all IDs.
+    }
+  }
+  const studentsByToken = new Map(session.roster.map((student) => [student.token, student]));
+  const studentsById = new Map(session.roster.map((student) => [student.id, student]));
+  const filtered = [...events].reverse().filter((event) => {
+    if (action && event.action !== action) return false;
+    const student =
+      studentsByToken.get(event.studentToken ?? '') ?? studentsById.get(event.studentId ?? '');
+    const text = `${event.studentId ?? ''} ${student?.id ?? ''} ${student?.displayId ?? ''} ${student?.name ?? ''} ${event.reason ?? ''}`;
+    return (
+      text.toLowerCase().includes(searchText) ||
+      Boolean(searchId && [event.studentId, student?.id].some((id) => id?.includes(searchId)))
     );
+  });
   return (
     <details className="card">
       <summary className="min-h-12 cursor-pointer text-xl font-semibold">
@@ -60,7 +73,7 @@ export function AuditTrail({ events, session }: { events: AuditEntry[]; session:
                 <td className="whitespace-nowrap p-2">{new Date(event.at).toLocaleString()}</td>
                 <td className="p-2">{event.action}</td>
                 <td className="p-2">
-                  {session.roster.find((student) => student.token === event.studentToken)?.name ??
+                  {studentsByToken.get(event.studentToken ?? '')?.name ??
                     event.studentId ??
                     'Session'}
                 </td>

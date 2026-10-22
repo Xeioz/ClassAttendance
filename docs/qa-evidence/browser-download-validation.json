@@ -1,0 +1,10 @@
+{
+  "reader": "openpyxl 3.1.5",
+  "source": "Actual production-browser download with one visible filtered row",
+  "attendanceRecords": 3,
+  "displayAndCanonicalMappingVerified": true,
+  "expectedNamesAndStatusesVerified": true,
+  "frozenHeadersAndWrappingPersisted": true,
+  "csvRecords": 3,
+  "desktopVisualVerification": "Not tested"
+}

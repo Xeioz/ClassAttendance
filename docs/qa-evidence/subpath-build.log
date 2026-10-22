@@ -1,0 +1,31 @@
+$ tsc -b && vite build --base=/ClassAttendance/ --outDir=/workspace/qa-implementation/subpath-build
+vite v6.3.6 building for production...
+
+(!) outDir /workspace/qa-implementation/subpath-build is not inside project root and will not be emptied.
+Use --emptyOutDir to override.
+
+transforming...
+✓ 152 modules transformed.
+rendering chunks...
+computing gzip size...
+../qa-implementation/subpath-build/offline-assets.json                           0.20 kB │ gzip:   0.15 kB
+../qa-implementation/subpath-build/manifest.webmanifest                          0.32 kB
+../qa-implementation/subpath-build/index.html                                    0.75 kB │ gzip:   0.41 kB
+../qa-implementation/subpath-build/assets/index-DtAhN_UO.css                    13.82 kB │ gzip:   3.49 kB
+../qa-implementation/subpath-build/assets/workbox-window.prod.es5-BBnX5xw4.js    5.75 kB │ gzip:   2.36 kB
+../qa-implementation/subpath-build/assets/index-C0c4vOGJ.js                    334.68 kB │ gzip:  99.93 kB
+../qa-implementation/subpath-build/assets/index-CsRVoIWm.js                    419.80 kB │ gzip: 136.40 kB
+../qa-implementation/subpath-build/assets/exceljs.min-D2rXXrX5.js              940.19 kB │ gzip: 271.33 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 7.01s
+
+PWA v1.0.0
+mode      generateSW
+precache  11 entries (1677.63 KiB)
+files generated
+  ../qa-implementation/subpath-build/sw.js
+  ../qa-implementation/subpath-build/workbox-9c191d2f.js

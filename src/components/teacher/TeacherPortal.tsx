@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { db, requestPersistence } from '../../db/db';
 import { unlockVault } from '../../db/vault';
 import { errorMessage } from '../../utils/errors';
@@ -14,12 +14,20 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [persistence, setPersistence] = useState('');
+  const pinInput = useRef<HTMLInputElement>(null);
+  const refreshVault = useCallback(async () => {
+    setExists(Boolean(await db.meta.get('vault')));
+  }, []);
   useEffect(() => {
-    void db.meta
-      .get('vault')
-      .then((value) => setExists(Boolean(value)))
-      .catch((error) => setError(errorMessage(error)));
-  }, [keys]);
+    void refreshVault().catch((error) => setError(errorMessage(error)));
+  }, [keys, refreshVault]);
+  async function restored() {
+    setPin('');
+    setConfirmation('');
+    setError('');
+    await refreshVault();
+    pinInput.current?.focus();
+  }
   const lock = useCallback(() => {
     setKeys(undefined);
     onActive(false);
@@ -93,6 +101,7 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
         <label>
           Master PIN (6–12 digits)
           <input
+            ref={pinInput}
             type="password"
             inputMode="numeric"
             autoComplete={exists ? 'current-password' : 'new-password'}
@@ -126,7 +135,7 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
           </p>
         ) : null}
       </form>
-      <BackupControls />
+      <BackupControls onRestored={restored} />
     </div>
   );
 }

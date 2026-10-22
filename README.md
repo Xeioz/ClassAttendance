@@ -1,6 +1,6 @@
 # Attendance Desk
 
-A browser-based QR attendance website built with React 19, TypeScript, Vite, Tailwind, Dexie, WebCrypto, PapaParse, qrcode, html5-qrcode, SheetJS, and Workbox. No native application or installation is required.
+A browser-based QR attendance website built with React 19, TypeScript, Vite, Tailwind, Dexie, WebCrypto, PapaParse, qrcode, html5-qrcode, ExcelJS, and Workbox. No native application or installation is required.
 
 ## Run
 
@@ -15,6 +15,7 @@ For the offline-capable production build:
 
 ```sh
 pnpm test
+pnpm qa:exports
 pnpm build
 pnpm preview
 ```
@@ -43,17 +44,17 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 
 ## Implementation map
 
-| Requested module | Implementation |
-| --- | --- |
-| A: database and encryption | `src/db/db.ts`, `crypto.ts`, `vault.ts`, `backup.ts` |
-| B: student ID and dynamic QR | `src/components/student/StudentPass.tsx`, `DynamicQR.tsx`, `src/hooks/wakeLock.ts` |
-| C: roster and camera | `src/components/teacher/RosterUpload.tsx`, `ScannerView.tsx`, `src/utils/csv.ts`, `camera.ts` |
-| C: accessible HUD and feedback | `src/components/common/AccessibleHUD.tsx`, `src/utils/feedback.ts` |
-| D: sessions and transactions | `src/domain/attendance.ts`, `checkIn.ts`, `sessionLifecycle.ts`, `qr.ts` |
-| D: reports | `src/domain/reports.ts`, `src/utils/excel.ts`, `csvExport.ts` |
-| Disputes and audit | `src/domain/audit.ts`, `src/components/teacher/DisputePanel.tsx`, `AuditTrail.tsx` |
-| Teacher orchestration | `src/components/teacher/TeacherPortal.tsx`, `TeacherWorkspace.tsx`, `ManualEntryDialog.tsx` |
-| Offline caching | `vite.config.ts`, `src/components/common/OfflineStatus.tsx` |
+| Requested module               | Implementation                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| A: database and encryption     | `src/db/db.ts`, `crypto.ts`, `vault.ts`, `backup.ts`                                          |
+| B: student ID and dynamic QR   | `src/components/student/StudentPass.tsx`, `DynamicQR.tsx`, `src/hooks/wakeLock.ts`            |
+| C: roster and camera           | `src/components/teacher/RosterUpload.tsx`, `ScannerView.tsx`, `src/utils/csv.ts`, `camera.ts` |
+| C: accessible HUD and feedback | `src/components/common/AccessibleHUD.tsx`, `src/utils/feedback.ts`                            |
+| D: sessions and transactions   | `src/domain/attendance.ts`, `checkIn.ts`, `sessionLifecycle.ts`, `qr.ts`                      |
+| D: reports                     | `src/domain/reports.ts`, `src/utils/excel.ts`, `csvExport.ts`                                 |
+| Disputes and audit             | `src/domain/audit.ts`, `src/components/teacher/DisputePanel.tsx`, `AuditTrail.tsx`            |
+| Teacher orchestration          | `src/components/teacher/TeacherPortal.tsx`, `TeacherWorkspace.tsx`, `ManualEntryDialog.tsx`   |
+| Offline caching                | `vite.config.ts`, `src/components/common/OfflineStatus.tsx`                                   |
 
 Files use `.ts`/`.tsx` instead of `.js`/`.jsx` to enforce strict TypeScript. `ExportModal` is an inline export control rather than a focus-trapping dialog; session rules are in the domain layer, not inside the export component.
 
@@ -72,7 +73,7 @@ Files use `.ts`/`.tsx` instead of `.js`/`.jsx` to enforce strict TypeScript. `Ex
 
 ## Offline and browser contract
 
-- All built JS/CSS and lazy decoder/export chunks are precached; no classroom runtime CDN requests are needed. The SheetJS official tarball is an install-time dependency, not a runtime CDN script.
+- All built JS/CSS and lazy decoder/export chunks are precached; no classroom runtime CDN requests are needed. ExcelJS creates formatted reports locally. The pinned SheetJS package independently checks generated files during QA; it is not loaded from a classroom runtime CDN.
 - Click Check offline readiness, then perform an actual cold offline launch. A readiness result checks cached resource existence, not a permanent guarantee against browser deletion or corruption.
 - `navigator.storage.persist()` can be unavailable or denied. Browser storage is finite; clearing website data or losing the device can lose records. Keep backups.
 - Writes and audit attempts commit transactionally before success feedback. A compound database primary key prevents duplicate attendance even with concurrent scans. A 1.5-second cooldown and continuous-target gate suppress held passes until the target clears; neither is an attendance integrity control.
@@ -82,12 +83,14 @@ Files use `.ts`/`.tsx` instead of `.js`/`.jsx` to enforce strict TypeScript. `Ex
 - Default timezone is the teacher device's browser timezone, explicitly displayed during session creation. Export timestamps use UTC. The device clock is not externally trusted. Correct queued students manually when cutoff fairness requires it.
 - QR freshness accepts 90 seconds past / 30 seconds future, allowing boundary/clock tolerance. These windows do not prevent replay. The unique attendance record is the real duplicate control.
 - CSV accepts UTF-8/BOM and Windows-1252 fallback or explicit selection. Arbitrary encoding detection is not claimed. Import rejects normalization collisions within a section. Confirm the ID normalization policy with the institution before importing real rosters.
-- Excel reports include institution/subject/room metadata, status shares, a complete audit worksheet, widths, merged title, filters and percentage formats. CSV includes formula guards. SheetJS Community Edition does not supply arbitrary styled badge/cell rendering here.
+- Excel schema 2 reports have separate Summary, Attendance, Audit trail and Report info sheets, explicit display/canonical ID columns, frozen table headers, wrapped text, row heights, filters and percentage formats. CSV retains its 16-column layout and formula guards. See [export schema and compatibility](docs/export-schema.md) before updating downstream imports.
 - Backup restore is limited to 25 MB and 100,000 rows per table. Larger archives require an evaluated streaming approach.
 
 ## Validation and remaining release work
 
 Automated tests cover crypto authentication/tampering, ID and QR validation, encoding, exact debounce/timing boundaries, concurrent duplicate writes, audit-write failures, closure, historical roster snapshots, wrong PINs, and backup recovery.
+
+QA remediation adds stable dispute drafts, complete pre-restore payload validation with legacy support, immediate restore UI refresh, displayed-ID search, complete searchable roster preview, and serialized workbook-format checks. See the [current QA status](docs/qa-status.md) for executed evidence and remaining release gates. `pnpm qa:exports` generates and reconciles 0/1/45/10,000-row synthetic files; CI also reopens them independently with openpyxl.
 
 Phase 3 adds read-only closure, reasoned reopening, dispute review, original timestamps, coherent report snapshots, and a native manual dialog. Phase 4 adds CI, an opt-in Pages deployment workflow, field observation tooling, user guides, and defense artifacts. See [implementation record](docs/phase-3-4.md), [teacher guide](docs/teacher-guide.md), [deployment](docs/deployment.md), and [field protocol](docs/field-protocol.md).
 

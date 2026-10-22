@@ -1,5 +1,7 @@
 # Implementation verification
 
+This document records the original prototype verification. For the subsequent QA fixes, newly executed tests, schema-2 export evidence and current release limitations, use [QA implementation status](docs/qa-status.md). Historical results below are not a substitute for the current checks.
+
 ## Story
 
 Student/browser QR generation and teacher/browser roster, session, attendance, correction, and export operations use local encrypted IndexedDB. There is no API server or cloud database in this scope.

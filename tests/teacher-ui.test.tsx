@@ -29,7 +29,7 @@ beforeEach(async () => {
     for (const table of db.tables) await table.clear();
   });
   keys = await unlockVault('104928573612');
-  await saveRoster(keys, [{ id: '001', name: 'Test Student', section: 'A' }]);
+  await saveRoster(keys, [{ id: '001', displayId: '00-1', name: 'Test Student', section: 'A' }]);
   await createSession(keys, {
     course: 'IT301',
     section: 'A',
@@ -46,9 +46,15 @@ describe('teacher interface workflow', () => {
   it('opens F2 manual dialog, saves excusal, closes read-only, and reopens with a reason', async () => {
     render(<TeacherWorkspace keys={keys} onActive={() => {}} />);
     await screen.findByRole('button', { name: 'Manual check-in / correction (F2)' });
+    fireEvent.change(screen.getByLabelText('Search roster'), { target: { value: '00-1' } });
+    expect(screen.getByRole('row', { name: /00-1 Test Student/ })).toBeTruthy();
     fireEvent.keyDown(window, { key: 'F2' });
     const dialog = await screen.findByRole('dialog');
     expect(screen.getByText('Camera paused for manual entry')).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText('Search students'), {
+      target: { value: '00-1' },
+    });
+    expect(within(dialog).getByRole('option', { name: 'Test Student · 00-1' })).toBeTruthy();
     const token = (await listSessions(keys))[0].roster[0].token;
     fireEvent.change(within(dialog).getByLabelText('Enrolled student'), {
       target: { value: token },

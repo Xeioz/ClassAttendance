@@ -9,10 +9,12 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "field:analyze": "node --experimental-strip-types scripts/analyze-field-run.ts",
-    "format": "prettier --write src tests vite.config.ts tailwind.config.js postcss.config.js"
+    "format": "prettier --write src tests vite.config.ts tailwind.config.js postcss.config.js",
+    "qa:exports": "node scripts/generate-qa-exports.mjs"
   },
   "dependencies": {
     "dexie": "4.0.11",
+    "exceljs": "4.4.0",
     "html5-qrcode": "2.3.8",
     "papaparse": "5.5.3",
     "qrcode": "1.5.4",

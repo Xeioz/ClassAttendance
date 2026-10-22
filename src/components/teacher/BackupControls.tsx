@@ -3,7 +3,13 @@ import { exportBackup, restoreBackup } from '../../db/backup';
 import { errorMessage } from '../../utils/errors';
 import type { VaultKeys } from '../../types';
 
-export function BackupControls({ keys }: { keys?: VaultKeys }) {
+export function BackupControls({
+  keys,
+  onRestored,
+}: {
+  keys?: VaultKeys;
+  onRestored?: () => Promise<void>;
+}) {
   const [file, setFile] = useState<File>();
   const [pin, setPin] = useState('');
   const [confirm, setConfirm] = useState(false);
@@ -12,6 +18,7 @@ export function BackupControls({ keys }: { keys?: VaultKeys }) {
   async function backup() {
     if (!keys) return;
     setBusy(true);
+    setMessage('');
     try {
       await exportBackup(keys);
       setMessage(
@@ -27,9 +34,19 @@ export function BackupControls({ keys }: { keys?: VaultKeys }) {
     event.preventDefault();
     if (!file || !confirm) return;
     setBusy(true);
+    setMessage('');
     try {
       const restored = await restoreBackup(file, pin);
       setPin('');
+      setConfirm(false);
+      try {
+        await onRestored?.();
+      } catch {
+        setMessage(
+          'Backup restored, but the unlock form could not refresh. Reload to unlock with the backup PIN.',
+        );
+        return;
+      }
       setMessage(
         `Restored ${restored.courses} courses, ${restored.students} roster entries, and ${restored.sessions} attendance sessions. Unlock with the backup PIN.`,
       );
@@ -60,6 +77,7 @@ export function BackupControls({ keys }: { keys?: VaultKeys }) {
               onChange={(event) => {
                 setFile(event.target.files?.[0]);
                 setConfirm(false);
+                setMessage('');
               }}
               required
               disabled={busy}
