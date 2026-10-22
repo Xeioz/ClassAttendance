@@ -34,8 +34,8 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 ## First classroom workflow
 
 1. Open Teacher workspace and create a Master PIN. Use a long random PIN and record it securely. No reset can decrypt forgotten-PIN records.
-2. Import a CSV with `id,name,section` headers. A synthetic sample is available at `public/sample-roster.csv`. Preview names, encoding, normalized IDs, and sections before merging.
-3. Create a session for an imported section, choose start time/grace, and announce the 3–6 digit room challenge. Device timezone is explicitly displayed.
+2. Import a CSV with `id,name,section` headers. Review additions, updates, unchanged rows, invalid rows, and identity conflicts. Approve each changed identity, then explicitly save. Invalid or conflicting rows block the whole file; omitted students remain enrolled.
+3. Save reusable class templates or enter class settings directly. Review the pre-class checklist and current roster, choose a fresh 3–6 digit room challenge, and explicitly create the session. Start input uses the device timezone; the class/report timezone is a separate setting.
 4. Students open Student pass, enter their ID and challenge, and display a QR. Optional ID memory is confined to their browser.
 5. Verify student identity, start the teacher camera, and scan. Choose compatibility decoder if native decoding fails. Manual check-in remains available.
 6. Review saved records and disputes. Use F2 for manual attendance or reasoned corrections. Resolve disputes before closure. Closed sessions are read-only; reopen with a reason before changes.
@@ -55,6 +55,9 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 | Disputes and audit             | `src/domain/audit.ts`, `src/components/teacher/DisputePanel.tsx`, `AuditTrail.tsx`            |
 | Teacher orchestration          | `src/components/teacher/TeacherPortal.tsx`, `TeacherWorkspace.tsx`, `ManualEntryDialog.tsx`   |
 | Offline caching                | `vite.config.ts`, `src/components/common/OfflineStatus.tsx`                                   |
+| Class templates and review     | `src/domain/templates.ts`, `classSettings.ts`, `src/components/teacher/SessionForm.tsx`       |
+| Roster comparison and guards   | `src/domain/rosterImport.ts`, `rosterSnapshot.ts`, `src/utils/rosterValidation.ts`            |
+| Readiness and translation      | `src/components/teacher/PreClassReadiness.tsx`, `src/domain/readiness.ts`, `src/i18n/`        |
 
 Files use `.ts`/`.tsx` instead of `.js`/`.jsx` to enforce strict TypeScript. `ExportModal` is an inline export control rather than a focus-trapping dialog; session rules are in the domain layer, not inside the export component.
 
@@ -90,7 +93,9 @@ Files use `.ts`/`.tsx` instead of `.js`/`.jsx` to enforce strict TypeScript. `Ex
 
 Automated tests cover crypto authentication/tampering, ID and QR validation, encoding, exact debounce/timing boundaries, concurrent duplicate writes, audit-write failures, closure, historical roster snapshots, wrong PINs, and backup recovery.
 
-QA remediation adds stable dispute drafts, complete pre-restore payload validation with legacy support, immediate restore UI refresh, displayed-ID search, complete searchable roster preview, and serialized workbook-format checks. See the [current QA status](docs/qa-status.md) for executed evidence and remaining release gates. `pnpm qa:exports` generates and reconciles 0/1/45/10,000-row synthetic files; CI also reopens them independently with openpyxl.
+The next release adds encrypted reusable templates, complete roster-change reviews with stale-write protection, a pre-class checklist, and accessibility/localization foundations with bundled English fallback. See the [implementation and verification report](docs/next-release-status.md), [storage and backup compatibility](docs/next-release-storage.md), and [proposed roadmap](docs/next-release-roadmap.md). Additional institutional languages still need selection and reviewed translations.
+
+Earlier QA remediation includes stable dispute drafts, complete pre-restore payload validation with legacy support, immediate restore UI refresh, displayed-ID search, and serialized workbook-format checks. The [previous QA record](docs/qa-status.md) preserves that evidence. `pnpm qa:exports` generates and reconciles 0/1/45/10,000-row synthetic files; CI also reopens them independently with openpyxl.
 
 Phase 3 adds read-only closure, reasoned reopening, dispute review, original timestamps, coherent report snapshots, and a native manual dialog. Phase 4 adds CI, an opt-in Pages deployment workflow, field observation tooling, user guides, and defense artifacts. See [implementation record](docs/phase-3-4.md), [teacher guide](docs/teacher-guide.md), [deployment](docs/deployment.md), and [field protocol](docs/field-protocol.md).
 

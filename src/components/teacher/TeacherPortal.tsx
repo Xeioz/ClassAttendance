@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { t } from '../../i18n';
 import { db, requestPersistence } from '../../db/db';
 import { unlockVault } from '../../db/vault';
 import { errorMessage } from '../../utils/errors';
@@ -13,8 +14,16 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
   const [exists, setExists] = useState<boolean>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [errorField, setErrorField] = useState<'pin' | 'confirmation'>();
   const [persistence, setPersistence] = useState('');
   const pinInput = useRef<HTMLInputElement>(null);
+  const confirmationInput = useRef<HTMLInputElement>(null);
+  const id = useId();
+  useEffect(() => {
+    if (busy) return;
+    if (errorField === 'pin') pinInput.current?.focus();
+    if (errorField === 'confirmation') confirmationInput.current?.focus();
+  }, [errorField, busy]);
   const refreshVault = useCallback(async () => {
     setExists(Boolean(await db.meta.get('vault')));
   }, []);
@@ -25,6 +34,7 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
     setPin('');
     setConfirmation('');
     setError('');
+    setErrorField(undefined);
     await refreshVault();
     pinInput.current?.focus();
   }
@@ -52,13 +62,24 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
   }, [keys, lock]);
   async function unlock(event: FormEvent) {
     event.preventDefault();
-    setBusy(true);
     setError('');
+    setErrorField(undefined);
+    if (!/^\d{6,12}$/.test(pin)) {
+      setError(t('portal.pinInvalid'));
+      setErrorField('pin');
+      pinInput.current?.focus();
+      return;
+    }
+    setBusy(true);
     try {
       const hasVault = Boolean(await db.meta.get('vault'));
       setExists(hasVault);
-      if (!hasVault && pin !== confirmation)
-        throw new Error('The new PIN and confirmation must match.');
+      if (!hasVault && pin !== confirmation) {
+        setError(t('portal.pinMismatch'));
+        setErrorField('confirmation');
+        confirmationInput.current?.focus();
+        return;
+      }
       const unlocked = await unlockVault(pin);
       setKeys(unlocked);
       setPin('');
@@ -74,8 +95,8 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{persistence}</p>
-        <button className="secondary" onClick={lock}>
-          Lock teacher records
+        <button type="button" className="secondary" onClick={lock}>
+          {t('portal.lock')}
         </button>
       </div>
       <TeacherWorkspace keys={keys} onActive={onActive} />
@@ -83,25 +104,22 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
     </>
   ) : (
     <div className="mx-auto grid max-w-xl gap-5">
-      <form className="card grid gap-5" onSubmit={unlock}>
+      <form noValidate className="card grid gap-5" onSubmit={unlock} aria-busy={busy}>
         <div>
-          <p className="eyebrow">Teacher workspace</p>
+          <p className="eyebrow">{t('portal.eyebrow')}</p>
           <h2 className="mt-2 text-2xl">
-            {exists === false ? 'Protect your local records' : 'Unlock local records'}
+            {exists === false ? t('portal.protect') : t('portal.unlock')}
           </h2>
-          <p className="mt-3 text-sm text-slate-600">
-            Records stay in this browser. Your Master PIN is never sent to a server.
-          </p>
+          <p className="mt-3 text-sm text-slate-600">{t('portal.description')}</p>
         </div>
-        <p className="notice">
-          A short numeric PIN has limited resistance to offline guessing. Use a long random PIN,
-          protect this device, and keep encrypted backups. Encryption alone does not establish legal
-          compliance.
-        </p>
+        <p className="notice">{t('portal.security')}</p>
         <label>
-          Master PIN (6–12 digits)
+          {t('portal.pin')}
           <input
             ref={pinInput}
+            aria-invalid={errorField === 'pin'}
+            aria-describedby={errorField === 'pin' ? `${id}-error` : undefined}
+            disabled={busy}
             type="password"
             inputMode="numeric"
             autoComplete={exists ? 'current-password' : 'new-password'}
@@ -115,8 +133,12 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
         </label>
         {exists === false ? (
           <label>
-            Confirm new PIN
+            {t('portal.confirm')}
             <input
+              ref={confirmationInput}
+              aria-invalid={errorField === 'confirmation'}
+              aria-describedby={errorField === 'confirmation' ? `${id}-error` : undefined}
+              disabled={busy}
               type="password"
               inputMode="numeric"
               autoComplete="new-password"
@@ -127,10 +149,16 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
           </label>
         ) : null}
         <button className="btn" disabled={busy || exists === undefined}>
-          {busy ? 'Unlocking…' : exists ? 'Unlock teacher workspace' : 'Create encrypted workspace'}
+          {busy
+            ? t('portal.unlocking')
+            : exists === undefined
+              ? t('portal.loading')
+              : exists
+                ? t('portal.unlockButton')
+                : t('portal.create')}
         </button>
         {error ? (
-          <p role="alert" className="notice">
+          <p id={`${id}-error`} role="alert" className="notice">
             {error}
           </p>
         ) : null}

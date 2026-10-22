@@ -1,15 +1,16 @@
 import type { QRPayload } from '../types';
+import { t } from '../i18n';
 import { normalizeId } from '../utils/normalize';
 
 export function parseQR(raw: string, challenge: string, now = Date.now()): QRPayload {
-  if (raw.length > 512) throw new Error('QR payload is too large.');
+  if (raw.length > 512) throw new Error(t('qr.large'));
   let value: unknown;
   try {
     value = JSON.parse(raw);
   } catch {
-    throw new Error('This is not an attendance QR code.');
+    throw new Error(t('qr.notAttendance'));
   }
-  if (!value || typeof value !== 'object') throw new Error('Invalid QR payload.');
+  if (!value || typeof value !== 'object') throw new Error(t('qr.invalid'));
   const p = value as Record<string, unknown>;
   if (
     p.v !== 1 ||
@@ -18,15 +19,11 @@ export function parseQR(raw: string, challenge: string, now = Date.now()): QRPay
     typeof p.ts !== 'number' ||
     !Number.isSafeInteger(p.ts)
   )
-    throw new Error('Unsupported QR payload.');
+    throw new Error(t('qr.unsupported'));
   const id = normalizeId(p.id);
-  if (p.ch !== challenge)
-    throw new Error('Wrong room challenge. Ask the student to update their pass.');
+  if (p.ch !== challenge) throw new Error(t('qr.wrongChallenge'));
   const age = Math.floor(now / 1000) - p.ts;
-  if (age < -30 || age > 90)
-    throw new Error(
-      'Pass expired or device clock differs. Refresh the pass or use manual check-in.',
-    );
+  if (age < -30 || age > 90) throw new Error(t('qr.expired'));
   return { v: 1, id, ch: p.ch, ts: p.ts };
 }
 export function punctuality(

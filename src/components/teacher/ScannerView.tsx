@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { ContinuousScanGate } from '../../domain/qr';
 import { startCamera, type CameraHandle } from '../../utils/camera';
 import { errorMessage } from '../../utils/errors';
+import { t } from '../../i18n';
 
 export function ScannerView({
   onScan,
@@ -79,9 +80,7 @@ export function ScannerView({
         if (!disposed) setDevices(available.filter((item) => item.kind === 'videoinput'));
       } catch (error) {
         if (!disposed) {
-          setError(
-            `Camera unavailable: ${errorMessage(error)}. Manual check-in is available below.`,
-          );
+          setError(t('scanner.unavailable', { error: errorMessage(error) }));
           setRunning(false);
         }
       }
@@ -100,40 +99,53 @@ export function ScannerView({
       await camera.current?.torch(!torch);
       setTorch((value) => !value);
     } catch {
-      setError('Torch is not available on this camera/browser.');
+      setError(t('scanner.torchUnavailable'));
     }
   }
   return (
-    <section aria-label="QR camera scanner" className="grid gap-4">
+    <section aria-label={t('scanner.label')} className="grid gap-4">
       <div id={hostId} className="min-h-48 overflow-hidden rounded-xl bg-slate-950" />
       <div className="flex flex-wrap gap-3">
         <button
+          type="button"
+          disabled={paused}
+          aria-describedby={paused ? `${hostId}-paused` : error ? `${hostId}-error` : undefined}
           className={running ? 'secondary' : 'btn'}
           onClick={() => {
             setError('');
             setRunning((value) => !value);
           }}
         >
-          {running ? 'Stop camera' : 'Start camera'}
+          {running ? t('scanner.stop') : t('scanner.start')}
         </button>
-        {running && hasTorch ? (
-          <button className="secondary" aria-pressed={torch} onClick={() => void toggleTorch()}>
-            Torch {torch ? 'off' : 'on'}
+        {running && !paused && hasTorch ? (
+          <button
+            type="button"
+            className="secondary"
+            aria-pressed={torch}
+            onClick={() => void toggleTorch()}
+          >
+            {torch ? t('scanner.torchOff') : t('scanner.torchOn')}
           </button>
         ) : null}
       </div>
+      {paused ? (
+        <p id={`${hostId}-paused`} className="text-sm">
+          {t('scanner.paused')}
+        </p>
+      ) : null}
       {devices.length > 1 ? (
         <label>
-          Camera
+          {t('scanner.camera')}
           <select
             disabled={running}
             value={device}
             onChange={(event) => setDevice(event.target.value)}
           >
-            <option value="">Automatic rear camera</option>
+            <option value="">{t('scanner.automatic')}</option>
             {devices.map((item, index) => (
               <option key={item.deviceId} value={item.deviceId}>
-                {item.label || `Camera ${index + 1}`}
+                {item.label || t('scanner.number', { number: index + 1 })}
               </option>
             ))}
           </select>
@@ -147,10 +159,10 @@ export function ScannerView({
           disabled={running}
           onChange={(event) => setFallback(event.target.checked)}
         />
-        Use compatibility decoder
+        {t('scanner.compatibility')}
       </label>
       {error ? (
-        <p role="alert" className="notice">
+        <p id={`${hostId}-error`} role="alert" className="notice">
           {error}
         </p>
       ) : null}

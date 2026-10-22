@@ -17,6 +17,27 @@ export interface StudentRow {
 export interface Student extends StudentPrivate {
   token: string;
 }
+/** Reusable settings deliberately exclude session credentials, times, and rosters. */
+export interface ClassSettings {
+  course: string;
+  section: string;
+  subject?: string;
+  room?: string;
+  institution?: string;
+  graceMinutes: number;
+  timezone: string;
+}
+export interface ClassTemplate {
+  id: string;
+  name: string;
+  settings: ClassSettings;
+  createdAt: number;
+  updatedAt: number;
+}
+export interface TemplateRow {
+  id: string;
+  encrypted: Cipher;
+}
 export interface SessionPrivate {
   course: string;
   section: string;

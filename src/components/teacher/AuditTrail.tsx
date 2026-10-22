@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AuditEntry, Session } from '../../types';
 import { normalizeId } from '../../utils/normalize';
+import { t } from '../../i18n';
 
 export function AuditTrail({ events, session }: { events: AuditEntry[]; session: Session }) {
   const [query, setQuery] = useState('');
@@ -29,22 +30,18 @@ export function AuditTrail({ events, session }: { events: AuditEntry[]; session:
   return (
     <details className="card">
       <summary className="min-h-12 cursor-pointer text-xl font-semibold">
-        Audit trail ({events.length} events)
+        {t('audit.title', { count: events.length })}
       </summary>
-      <p className="mb-4 mt-3 text-sm text-slate-600">
-        Application history is append-only through this interface. It is not independent proof
-        against device-owner tampering. TEACHER_PIN identifies local unlock authority, not a
-        verified school account.
-      </p>
+      <p className="mb-4 mt-3 text-sm text-slate-600">{t('audit.description')}</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <label>
-          Search audit history
+          {t('audit.search')}
           <input value={query} onChange={(event) => setQuery(event.target.value)} type="search" />
         </label>
         <label>
-          Action
+          {t('audit.action')}
           <select value={action} onChange={(event) => setAction(event.target.value)}>
-            <option value="">All actions</option>
+            <option value="">{t('audit.all')}</option>
             {[...new Set(events.map((event) => event.action))].sort().map((value) => (
               <option key={value}>{value}</option>
             ))}
@@ -52,17 +49,22 @@ export function AuditTrail({ events, session }: { events: AuditEntry[]; session:
         </label>
       </div>
       <p className="my-3 text-xs">
-        Showing {Math.min(100, filtered.length)} of {filtered.length} matching events. Excel
-        includes the complete audit trail.
+        {t('audit.showing', { shown: Math.min(100, filtered.length), count: filtered.length })}
       </p>
       <div className="max-h-96 overflow-auto">
         <table className="w-full text-left text-sm">
-          <caption className="sr-only">Session audit events</caption>
+          <caption className="sr-only">{t('audit.caption')}</caption>
           <thead>
             <tr>
-              {['Time', 'Action', 'Student', 'Status change', 'Reason'].map((label) => (
-                <th className="p-2" key={label}>
-                  {label}
+              {[
+                'audit.time',
+                'audit.action',
+                'audit.student',
+                'audit.statusChange',
+                'audit.reason',
+              ].map((label) => (
+                <th scope="col" className="p-2" key={label}>
+                  {t(label)}
                 </th>
               ))}
             </tr>
@@ -75,10 +77,11 @@ export function AuditTrail({ events, session }: { events: AuditEntry[]; session:
                 <td className="p-2">
                   {studentsByToken.get(event.studentToken ?? '')?.name ??
                     event.studentId ??
-                    'Session'}
+                    t('audit.session')}
                 </td>
                 <td className="p-2">
-                  {event.previousStatus ?? '—'} / {event.newStatus ?? '—'}
+                  {event.previousStatus ? t(`status.${event.previousStatus}`) : '—'} /{' '}
+                  {event.newStatus ? t(`status.${event.newStatus}`) : '—'}
                 </td>
                 <td className="min-w-48 p-2">{event.reason ?? '—'}</td>
               </tr>

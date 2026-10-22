@@ -1,0 +1,42 @@
+{
+  "syntheticData": true,
+  "url": "http://127.0.0.1:4178/",
+  "checks": [
+    "Keyboard workspace creation, field-linked validation, template creation/duplication/independent edit, explicit start and fresh challenge; camera failure retains manual alternative",
+    "Encrypted templates, bundled English and the updated teacher guide work during an offline production tab reload; this is not a cold device restart",
+    "Invalid/conflicting import blocked; cancel unchanged; before/after update approval; two-tab stale comparison requires second explicit save; omitted students retained",
+    "New session uses all five current students; manual attendance saves after camera failure; template deletion leaves active session and attendance unchanged; backup request does not claim safe storage/recovery",
+    "375px layout and 200% text enlargement retain page width; screenshots preserved; real assistive technology not tested",
+    "Downloaded v2 backup restored templates, current roster, active session and attendance into a fresh Chromium context; not a second physical device"
+  ],
+  "accessibility": [
+    {
+      "screen": "Create workspace",
+      "violations": [],
+      "incomplete": [],
+      "passedRules": 23
+    },
+    {
+      "screen": "Templates and readiness",
+      "violations": [],
+      "incomplete": [],
+      "passedRules": 27
+    },
+    {
+      "screen": "Roster change review",
+      "violations": [],
+      "incomplete": [],
+      "passedRules": 29
+    },
+    {
+      "screen": "Manual attendance dialog",
+      "violations": [],
+      "incomplete": [
+        "color-contrast"
+      ],
+      "passedRules": 15
+    }
+  ],
+  "pageErrors": [],
+  "passed": true
+}

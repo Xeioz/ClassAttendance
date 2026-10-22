@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import { t } from '../i18n';
 import { db } from '../db/db';
 import { decrypt, encrypt } from '../db/crypto';
 import { assertActiveVault, makeAudit, validateReason } from './audit';
@@ -14,8 +15,7 @@ export async function recordAttendance(
   now = Date.now(),
 ): Promise<ScanResult> {
   const stored = await db.sessions.get(sessionId);
-  if (!stored || stored.state !== 'ACTIVE')
-    throw new Error('This session is closed or unavailable.');
+  if (!stored || stored.state !== 'ACTIVE') throw new Error(t('scan.closed'));
   const session = await decrypt<SessionPrivate>(
     keys.encryption,
     stored.encrypted,
@@ -25,10 +25,9 @@ export async function recordAttendance(
   const student = session.roster.find((row) => row.id === id);
   if ('student' in input) {
     validateReason(input.reason);
-    if (!student || input.student.token !== student.token)
-      throw new Error('Choose an enrolled student.');
+    if (!student || input.student.token !== student.token) throw new Error(t('scan.chooseStudent'));
     if (input.status !== undefined && !['PRESENT', 'LATE', 'EXCUSED'].includes(input.status))
-      throw new Error('Invalid manual check-in status.');
+      throw new Error(t('scan.invalidManualStatus'));
   }
   const entry: AttendancePrivate = {
     status:
@@ -52,7 +51,7 @@ export async function recordAttendance(
         JSON.stringify((await db.sessions.get(sessionId))?.encrypted) !==
         JSON.stringify(stored.encrypted)
       )
-        throw new Error('The session changed. Refresh and retry.');
+        throw new Error(t('scan.sessionChanged'));
       const existing = student ? await db.attendance.get([sessionId, student.token]) : undefined;
       const prior = existing
         ? await Dexie.waitFor(
@@ -95,22 +94,30 @@ export async function recordAttendance(
   if (result.kind === 'unknown')
     return {
       kind: 'unknown',
-      title: 'Not in this roster',
-      detail: `${id} · Enrollment has not been changed.`,
+      title: t('scan.unlisted'),
+      detail: t('scan.unlistedDetail', { id }),
     };
   if (result.kind === 'duplicate')
     return {
       kind: 'duplicate',
-      title: 'Already recorded',
-      detail: `${student!.name} · ${result.prior!.status} · ${new Date(result.prior!.originalAt ?? result.prior!.at).toLocaleTimeString()}`,
+      title: t('scan.duplicate'),
+      detail: t('scan.duplicateDetail', {
+        name: student!.name,
+        status: t(`status.${result.prior!.status}`),
+        time: new Date(result.prior!.originalAt ?? result.prior!.at).toLocaleTimeString(),
+      }),
       studentToken: student!.token,
       firstAt: result.prior!.originalAt ?? result.prior!.at,
       secondAt: now,
     };
   return {
     kind: 'valid',
-    title: `${entry.status === 'EXCUSED' ? 'Excused' : entry.status === 'LATE' ? 'Late' : 'Present'} · Saved`,
-    detail: `${student!.name} · ${student!.id} · ${new Date(now).toLocaleTimeString()}`,
+    title: t(`scan.saved.${entry.status}`),
+    detail: t('scan.savedDetail', {
+      name: student!.name,
+      id: student!.id,
+      time: new Date(now).toLocaleTimeString(),
+    }),
     studentToken: student!.token,
   };
 }
@@ -124,16 +131,15 @@ export async function correctAttendance(
 ): Promise<void> {
   validateReason(reason);
   if (!['PRESENT', 'LATE', 'ABSENT', 'EXCUSED'].includes(status))
-    throw new Error('Invalid attendance status.');
+    throw new Error(t('scan.invalidStatus'));
   const session = await db.sessions.get(sessionId);
-  if (!session || session.state !== 'ACTIVE')
-    throw new Error('Reopen the session before changing its records.');
+  if (!session || session.state !== 'ACTIVE') throw new Error(t('scan.reopen'));
   if (
     !(
       await decrypt<SessionPrivate>(keys.encryption, session.encrypted, `session:${sessionId}`)
     ).roster.some((row) => row.token === student.token)
   )
-    throw new Error('Student does not belong to this session.');
+    throw new Error(t('scan.wrongSession'));
   const priorRow = await db.attendance.get([sessionId, student.token]);
   const prior = priorRow
     ? await decrypt<AttendancePrivate>(
@@ -171,7 +177,7 @@ export async function correctAttendance(
       JSON.stringify(await db.attendance.get([sessionId, student.token])) !==
       JSON.stringify(priorRow)
     )
-      throw new Error('Attendance changed. Refresh and retry.');
+      throw new Error(t('scan.attendanceChanged'));
     await db.attendance.put({ sessionId, studentToken: student.token, encrypted: record });
     await db.scanEvents.add(event);
   });
