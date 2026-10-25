@@ -1,11 +1,15 @@
+import { prepareDatabase } from './compatibility';
 import Dexie, { type Table } from 'dexie';
 import type {
   AttendanceRow,
   EventRow,
   SessionRow,
   StudentRow,
-  TemplateRow,
   VaultMeta,
+  ClassRow,
+  EnrollmentRow,
+  TemplateRow,
+  MigrationRow,
 } from '../types';
 
 export class AttendanceDatabase extends Dexie {
@@ -14,7 +18,21 @@ export class AttendanceDatabase extends Dexie {
   scanEvents!: Table<EventRow, string>;
   attendance!: Table<AttendanceRow, [string, string]>;
   meta!: Table<VaultMeta, string>;
+  classes!: Table<ClassRow, string>;
+  enrollments!: Table<EnrollmentRow, [string, string]>;
   classTemplates!: Table<TemplateRow, string>;
+  migrations!: Table<MigrationRow, string>;
+  private opening?: ReturnType<Dexie['open']>;
+  override open(): ReturnType<Dexie['open']> {
+    if (!this.opening) {
+      this.opening = Dexie.Promise.resolve(prepareDatabase(this.name))
+        .then(() => super.open())
+        .finally(() => {
+          this.opening = undefined;
+        });
+    }
+    return this.opening;
+  }
   constructor(name = 'attendance-desk-v1') {
     super(name);
     this.version(1).stores({
@@ -24,21 +42,23 @@ export class AttendanceDatabase extends Dexie {
       attendance: '[sessionId+studentToken], sessionId',
       meta: '&id',
     });
-    // Keep the existing database name and tables. Dexie upgrades v1 in place,
-    // adding an empty encrypted-template store without rewriting historical data.
-    this.version(2).stores({ classTemplates: '&id' });
+    // Additive upgrade: encrypted legacy records and their identities are untouched.
+    this.version(2).stores({
+      classes: '&id',
+      enrollments: '[classId+studentToken], classId, studentToken',
+    });
+    this.version(3).stores({ classTemplates: '&id', migrations: '&id' });
+    this.on('versionchange', () => {
+      this.close();
+      if (typeof window !== 'undefined')
+        window.dispatchEvent(new Event('attendance:database-changed'));
+    });
+    this.on('blocked', () => {
+      if (typeof window !== 'undefined')
+        window.dispatchEvent(new Event('attendance:database-blocked'));
+    });
   }
 }
 export const db = new AttendanceDatabase();
 
-export async function requestPersistence(): Promise<string> {
-  try {
-    if (!navigator.storage?.persist) return 'Persistence API unavailable. Keep encrypted backups.';
-    const granted = await navigator.storage.persist();
-    const estimate = await navigator.storage.estimate();
-    const used = Math.round((estimate.usage ?? 0) / 1024);
-    return `${granted ? 'Persistent storage granted' : 'Persistence not granted'} · ${used} KB used. Backups are still required.`;
-  } catch {
-    return 'Unable to request persistent storage. Keep encrypted backups.';
-  }
-}
+export { requestPersistence } from './persistence';

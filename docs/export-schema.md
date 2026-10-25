@@ -15,17 +15,17 @@ Schema 2 uses ExcelJS 4.4.0 to persist formatting. It has four worksheets:
 
 This is an explicit XLSX layout change from schema 1, whose Attendance header was at row 18. Consumers that use fixed row positions must update before adopting schema 2. Summary values moved from Attendance to Summary, preserving their row positions within that sheet. Use the schema number in `Summary!B17` or the named headers when importing.
 
-The first eight Attendance value columns retain their order: displayed ID, name, section, status, first-recorded UTC, last-changed UTC, source and reason. Column A is now labeled **Student ID (display)**; appended column I is **Student ID (canonical)**.
+The first eight Attendance value columns retain their order: displayed ID, name, section, status, recorded/corrected UTC, last-changed UTC, source and reason. Column A is now labeled **Student ID (display)**; appended column I is **Student ID (canonical)**.
 
 The first eleven Audit trail value columns retain their order. Column D is explicitly **Student ID (canonical)**; appended column L is **Student ID (display)**. Join Attendance I to Audit trail D within the selected session. Unlisted scan events can legitimately have no corresponding roster row; their displayed ID falls back to the recorded ID rather than inventing a student.
 
 IDs are text, including leading zeros and long identifiers. Timestamps remain ISO UTC text rather than Excel date serials. Summary counts and rates remain numeric; rates are formatted `0.0%`. Untrusted formula-like strings are stored as text. The exporter creates no formulas. Names and reasons wrap; explicit row heights and column widths are saved. Header filters span the complete tables, and merged cells are confined to the Summary title.
 
-The attendance denominator remains all enrolled students, including excused students. Existing behavior blanks First recorded for ABSENT entries; changing the meaning for a corrected absence requires a product decision. Active reports remain explicitly marked **IN PROGRESS - NOT FINAL**.
+The attendance denominator remains all enrolled students, including excused students. Existing behavior blanks Recorded / corrected for ABSENT entries; changing the meaning for a corrected absence requires a product decision. Active reports remain explicitly marked **IN PROGRESS - NOT FINAL**.
 
 ## CSV compatibility
 
-The existing 16-column CSV order and labels are unchanged. CSV uses UTF-8 BOM, commas, CRLF and quoting. Formula-like values receive the existing apostrophe safety prefix. Empty direct-helper exports now contain the same headers; normal session creation still requires a nonempty roster. Spreadsheet auto-import can infer numeric types from CSV, so use XLSX or import identifier columns as text when leading zeros matter.
+The existing 16-column CSV order is unchanged. The time column uses the prototypev2 heading **Recorded / corrected (UTC)** in place of main’s earlier **First recorded (UTC)**; consumers matching headers must accept the updated name. Historical samples in `docs/samples/` retain their original bytes and earlier heading. CSV uses UTF-8 BOM, commas, CRLF and quoting. Formula-like values receive the existing apostrophe safety prefix. Empty direct-helper exports now contain the same headers; normal session creation still requires a nonempty roster. Spreadsheet auto-import can infer numeric types from CSV, so use XLSX or import identifier columns as text when leading zeros matter.
 
 ## Repeatable verification
 

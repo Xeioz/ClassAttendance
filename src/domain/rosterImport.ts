@@ -1,3 +1,4 @@
+import { listClasses } from './classes';
 import type { Student, VaultKeys } from '../types';
 import type { InspectedRosterRow, RosterInspection } from '../utils/csv';
 import { sameRosterStudent } from '../utils/rosterValidation';
@@ -12,6 +13,7 @@ export interface RosterReviewRow extends InspectedRosterRow {
   before?: Student;
 }
 export interface RosterReview {
+  classId?: string;
   inspection: RosterInspection;
   version: string;
   rows: RosterReviewRow[];
@@ -21,7 +23,16 @@ export interface RosterReview {
 export async function prepareRosterImport(
   keys: VaultKeys,
   inspection: RosterInspection,
+  classId?: string,
 ): Promise<RosterReview> {
+  if (classId) {
+    const offering = (await listClasses(keys)).find((item) => item.id === classId);
+    if (
+      !offering ||
+      inspection.rows.some((row) => row.student && row.student.section !== offering.section)
+    )
+      throw new Error('CSV section does not match the selected class.');
+  }
   const snapshot = await readRosterSnapshot(keys);
   const existing = new Map(
     snapshot.students.map((student) => [`${student.section}:${student.id}`, student]),
@@ -41,7 +52,7 @@ export async function prepareRosterImport(
     counts[category]++;
     return { ...row, before, category };
   });
-  return { inspection, version: snapshot.version, rows, counts };
+  return { classId, inspection, version: snapshot.version, rows, counts };
 }
 
 export async function commitRosterImport(
@@ -55,7 +66,7 @@ export async function commitRosterImport(
   await saveRoster(
     keys,
     review.rows.map((row) => row.student!),
-    { expectedVersion: review.version },
+    { expectedVersion: review.version, classId: review.classId },
   );
   return review.counts;
 }

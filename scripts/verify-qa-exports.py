@@ -9,7 +9,7 @@ import openpyxl
 output = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "artifacts/qa-exports")
 results = []
 for size in [0, 1, 45, 10000]:
-    expected = json.loads((output / f"expected-{size}.json").read_text())
+    expected = json.loads((output / f"expected-{size}.json").read_text(encoding='utf-8'))
     book = openpyxl.load_workbook(output / f"attendance-{size}.xlsx", data_only=False)
     assert book.sheetnames == ["Summary", "Attendance", "Audit trail", "Report info"]
     for name, header_key, rows_key, columns, pane in [

@@ -1,4 +1,13 @@
 const templates: Record<string, string> = {
+  'templates.reportDetails': 'Report details and timezone (optional)',
+  'templates.reportDefaults':
+    'Saved report details are retained. Report timezone: {timezone}. Expand to review or change them.',
+  'templates.generateChallenge': 'Generate room challenge',
+  'templates.challengeGenerated':
+    'Generated a fresh room challenge. Review it and share it with the class after creating the session.',
+  'templates.useCurrentTime': 'Use current time',
+  'templates.timeUpdated':
+    'Start time updated to this device’s current time. Review before creating the session.',
   'templates.beforeScanning': 'Before scanning',
   'templates.heading': 'Start a class session',
   'templates.savedHeading': 'Reusable class templates',

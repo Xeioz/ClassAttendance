@@ -20,7 +20,7 @@ export function sessionDate(session: Session): string {
 }
 export function reportFilename(session: Session, extension: 'xlsx' | 'csv'): string {
   const safe = (text: string) => text.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
-  return `${safe(session.course)}_${safe(session.section)}_Attendance_${sessionDate(session)}.${extension}`;
+  return `${safe(session.course)}_${safe(session.section)}_Attendance_${sessionDate(session)}_${safe(session.id)}.${extension}`;
 }
 export function recordedTime(entry?: AttendancePrivate): string {
   return !entry || entry.status === 'ABSENT'

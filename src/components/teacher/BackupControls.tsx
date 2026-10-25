@@ -11,7 +11,7 @@ export function BackupControls({
   onRestored,
 }: {
   keys?: VaultKeys;
-  onRestored?: () => Promise<void>;
+  onRestored?: () => void | Promise<void>;
 }) {
   const [file, setFile] = useState<File>();
   const [pin, setPin] = useState('');

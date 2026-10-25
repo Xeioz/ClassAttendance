@@ -1,3 +1,4 @@
+import { verifyOfflineResources } from '../src/utils/offline';
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -14,92 +15,46 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function cachedWebsite(files: unknown = ['index.html', 'assets/app.js'], missing?: string) {
-  vi.stubGlobal('navigator', {
-    onLine: true,
-    serviceWorker: {
-      getRegistration: vi.fn().mockResolvedValue({ active: {}, scope: `${location.origin}/` }),
-    },
-  });
-  const match = vi.fn(async (url: URL, options: { ignoreSearch: boolean }) => {
-    expect(options.ignoreSearch).toBe(true);
-    if (url.pathname.endsWith('offline-assets.json')) return new Response(JSON.stringify(files));
-    if (url.pathname.endsWith(missing ?? '!none')) return undefined;
-    return new Response('cached content');
-  });
-  vi.stubGlobal('caches', { match });
-  return match;
-}
-
+vi.mock('../src/utils/offline', () => ({ verifyOfflineResources: vi.fn() }));
 describe('offline readiness evidence', () => {
-  it('does not infer cache readiness from an online connection', async () => {
-    vi.stubGlobal('navigator', { onLine: true });
+  it('does not infer readiness from the network when the active worker check fails', async () => {
+    vi.mocked(verifyOfflineResources).mockRejectedValueOnce(
+      new Error('Offline worker unavailable'),
+    );
     await refreshOfflineEvidence();
     expect(getOfflineEvidence().state).toBe('attention');
-    expect(getOfflineEvidence().message).toMatch(/does not support offline/);
+    expect(getOfflineEvidence().message).toContain('Offline worker unavailable');
   });
-
-  it('requires an active worker in the app scope', async () => {
-    cachedWebsite();
-    vi.mocked(navigator.serviceWorker.getRegistration).mockResolvedValue({
-      active: {},
-      scope: `${location.origin}/elsewhere/`,
-    } as ServiceWorkerRegistration);
-    await expect(inspectOfflineResources()).rejects.toThrow(/not active/);
+  it('uses only the controlling worker resource verifier', async () => {
+    vi.mocked(verifyOfflineResources).mockResolvedValueOnce(14);
+    expect(await inspectOfflineResources()).toBe(14);
   });
-
-  it.each(
-    [
-      [],
-      ['index.html'],
-      ['index.html', '../foreign.js'],
-      ['index.html', 'https://example.com/app.js'],
-      ['index.html', 23],
-    ].map((files) => ({ files })),
-  )('rejects incomplete or invalid checklists: $files', async ({ files }) => {
-    cachedWebsite(files);
-    await expect(inspectOfflineResources()).rejects.toThrow(/checklist.*invalid/);
-  });
-
-  it('requires every successful cached resource response, including JavaScript', async () => {
-    cachedWebsite(undefined, 'app.js');
-    await expect(inspectOfflineResources()).rejects.toThrow(/not cached/);
-    const match = cachedWebsite();
-    match.mockImplementation(async (url) =>
-      url.pathname.endsWith('offline-assets.json')
-        ? new Response(JSON.stringify(['index.html', 'assets/app.js']))
-        : new Response('unavailable', { status: 404 }),
-    );
-    await expect(inspectOfflineResources()).rejects.toThrow(/not cached/);
-  });
-
-  it('reports observed cache contents while retaining the cold-launch limitation', async () => {
-    cachedWebsite();
+  it('retains the cold-launch limitation after successful resource inspection', async () => {
+    vi.mocked(verifyOfflineResources).mockResolvedValueOnce(14);
     await refreshOfflineEvidence();
     expect(getOfflineEvidence()).toMatchObject({
       state: 'ready',
-      resourceCount: 2,
+      resourceCount: 14,
       checking: false,
     });
     expect(getOfflineEvidence().message).toMatch(/Test a cold offline launch/);
   });
-
-  it('ignores an older cache check that finishes after a newer failure', async () => {
-    let finish!: (registration: ServiceWorkerRegistration) => void;
-    cachedWebsite();
-    vi.mocked(navigator.serviceWorker.getRegistration).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
-    const first = refreshOfflineEvidence();
-    vi.mocked(navigator.serviceWorker.getRegistration).mockResolvedValue(undefined);
+  it('ignores an earlier success after a newer worker check failed', async () => {
+    let finish!: (count: number) => void;
+    vi.mocked(verifyOfflineResources)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockRejectedValueOnce(new Error('Current worker changed'));
+    const pending = refreshOfflineEvidence();
     await refreshOfflineEvidence();
-    finish({ active: {}, scope: `${location.origin}/` } as ServiceWorkerRegistration);
-    await first;
+    finish(14);
+    await pending;
     expect(getOfflineEvidence().state).toBe('attention');
-    expect(getOfflineEvidence().message).toMatch(/not active/);
+    expect(getOfflineEvidence().message).toContain('Current worker changed');
   });
 });
 

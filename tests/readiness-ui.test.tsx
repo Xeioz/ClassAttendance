@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PreClassReadiness } from '../src/components/teacher/PreClassReadiness';
+import { SessionReadiness as PreClassReadiness } from '../src/components/teacher/SessionReadiness';
 import { recordBackupRequested, recordRestoreCompleted } from '../src/domain/readiness';
 import type { Session } from '../src/types';
 

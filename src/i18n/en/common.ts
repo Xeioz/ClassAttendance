@@ -1,4 +1,14 @@
 const common: Record<string, string> = {
+  'pagination.range': 'Showing {first}–{last} of {count} matching records',
+  'pagination.previous': 'Previous page',
+  'pagination.next': 'Next page',
+  'pagination.audit': 'Audit history pages',
+  'pagination.roster': 'Attendance roster pages',
+  'portal.persistenceUnknown': 'Storage persistence could not be checked. Keep encrypted backups.',
+  'portal.loadingWorkspace': 'Loading teacher workspace…',
+  'portal.loadFailed':
+    'The teacher workspace could not load. Retry, or reconnect to prepare the offline files. Local records have not been cleared.',
+  'portal.retry': 'Retry teacher workspace',
   'app.title': 'Attendance Desk',
   'app.secureTitle': 'Secure connection required',
   'app.secureDescription':

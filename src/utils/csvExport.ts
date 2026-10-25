@@ -3,12 +3,15 @@ import type { AttendancePrivate, Session } from '../types';
 import { recordedTime, reportFilename, sessionDate } from '../domain/reports';
 import { downloadFile } from './download';
 
+export function spreadsheetSafe(value: string): string {
+  return /^[\s]*[=+@-]|^[\t\r\n]/.test(value) ? `'${value}` : value;
+}
 export const CSV_HEADERS = [
   'Student ID',
   'Official name',
   'Section',
   'Status',
-  'First recorded (UTC)',
+  'Recorded / corrected (UTC)',
   'Last changed (UTC)',
   'Source',
   'Reason',
@@ -21,10 +24,6 @@ export const CSV_HEADERS = [
   'Session ID',
   'Session state',
 ];
-
-export function spreadsheetSafe(value: string): string {
-  return /^[\s]*[=+@-]|^[\t\r\n]/.test(value) ? `'${value}` : value;
-}
 export function attendanceCSV(
   session: Session,
   attendance: Map<string, AttendancePrivate>,
@@ -37,7 +36,7 @@ export function attendanceCSV(
         'Official name': student.name,
         Section: student.section,
         Status: entry?.status ?? 'NOT_YET_RECORDED',
-        'First recorded (UTC)': recordedTime(entry),
+        'Recorded / corrected (UTC)': recordedTime(entry),
         'Last changed (UTC)': entry ? new Date(entry.at).toISOString() : '',
         Source: entry?.source ?? '',
         Reason: entry?.reason ?? '',
@@ -54,7 +53,13 @@ export function attendanceCSV(
     .map((row) =>
       Object.fromEntries(Object.entries(row).map(([key, value]) => [key, spreadsheetSafe(value)])),
     );
-  return '\uFEFF' + Papa.unparse({ fields: CSV_HEADERS, data: rows }, { newline: '\r\n' });
+  return (
+    '\uFEFF' +
+    Papa.unparse(
+      { fields: CSV_HEADERS, data: rows.map((row) => CSV_HEADERS.map((field) => row[field])) },
+      { newline: '\r\n' },
+    )
+  );
 }
 export function exportCSV(session: Session, attendance: Map<string, AttendancePrivate>): void {
   downloadFile(

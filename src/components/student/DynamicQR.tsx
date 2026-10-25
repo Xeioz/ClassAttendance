@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { useWakeLock } from '../../hooks/wakeLock';
 import { errorMessage } from '../../utils/errors';
-import { t } from '../../i18n';
 
 export function DynamicQR({ id, challenge }: { id: string; challenge: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -39,7 +38,7 @@ export function DynamicQR({ id, challenge }: { id: string; challenge: string }) 
       <canvas
         ref={canvas}
         role="img"
-        aria-label={t('student.passLabel', { id })}
+        aria-label={`Attendance pass for student ${id}`}
         className="rounded-xl border border-slate-200"
       />
       {error ? (
@@ -50,11 +49,14 @@ export function DynamicQR({ id, challenge }: { id: string; challenge: string }) 
       <div className="text-center">
         <p className="text-xl font-semibold tracking-wider">{id}</p>
         <p className="text-sm text-slate-600">
-          {t('student.passRefresh', { challenge, seconds: 30 - (Math.floor(now / 1000) % 30) })}
+          Room challenge {challenge} · Refresh in {30 - (Math.floor(now / 1000) % 30)}s
         </p>
       </div>
       <p className="text-center text-sm text-slate-600">{lockStatus}</p>
-      <p className="notice">{t('student.passInstructions')}</p>
+      <p className="notice">
+        Show this pass to your teacher. Attendance is recorded only after the teacher confirms it
+        was saved.
+      </p>
     </div>
   );
 }

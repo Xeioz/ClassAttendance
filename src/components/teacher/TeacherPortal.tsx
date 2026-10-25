@@ -1,5 +1,6 @@
+import { useInactivityLock } from '../../hooks/inactivityLock';
+import { isTeacherBusy, useTeacherBusy } from '../../domain/operations';
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { t } from '../../i18n';
 import { db, requestPersistence } from '../../db/db';
 import { unlockVault } from '../../db/vault';
 import { errorMessage } from '../../utils/errors';
@@ -8,64 +9,71 @@ import { BackupControls } from './BackupControls';
 import { TeacherWorkspace } from './TeacherWorkspace';
 
 export function TeacherPortal({ onActive }: { onActive: (active: boolean) => void }) {
+  const id = useId();
+  const pinInput = useRef<HTMLInputElement>(null);
+  const confirmationInput = useRef<HTMLInputElement>(null);
+  const [errorField, setErrorField] = useState<'pin' | 'confirmation'>();
+  const unlockAttempt = useRef(0);
+  const operationBusy = useTeacherBusy();
+  const [lockRequested, setLockRequested] = useState(false);
+  const [revision, setRevision] = useState(0);
   const [keys, setKeys] = useState<VaultKeys>();
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [exists, setExists] = useState<boolean>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [errorField, setErrorField] = useState<'pin' | 'confirmation'>();
   const [persistence, setPersistence] = useState('');
-  const pinInput = useRef<HTMLInputElement>(null);
-  const confirmationInput = useRef<HTMLInputElement>(null);
-  const id = useId();
   useEffect(() => {
     if (busy) return;
     if (errorField === 'pin') pinInput.current?.focus();
     if (errorField === 'confirmation') confirmationInput.current?.focus();
   }, [errorField, busy]);
-  const refreshVault = useCallback(async () => {
-    setExists(Boolean(await db.meta.get('vault')));
-  }, []);
   useEffect(() => {
-    void refreshVault().catch((error) => setError(errorMessage(error)));
-  }, [keys, refreshVault]);
-  async function restored() {
+    let alive = true;
+    void db.meta
+      .get('vault')
+      .then((value) => {
+        if (alive) setExists(Boolean(value));
+      })
+      .catch((error) => {
+        if (alive) setError(errorMessage(error));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [keys, revision]);
+  const lock = useCallback(() => {
+    unlockAttempt.current++;
     setPin('');
     setConfirmation('');
-    setError('');
-    setErrorField(undefined);
-    await refreshVault();
-    pinInput.current?.focus();
-  }
-  const lock = useCallback(() => {
+    setBusy(false);
+    if (isTeacherBusy()) {
+      setLockRequested(true);
+      return;
+    }
+    setLockRequested(false);
     setKeys(undefined);
     onActive(false);
   }, [onActive]);
   useEffect(() => {
-    if (!keys) return;
-    let timer: number;
-    const reset = () => {
-      clearTimeout(timer);
-      timer = window.setTimeout(lock, 15 * 60_000);
-    };
-    reset();
-    window.addEventListener('pointerdown', reset);
-    window.addEventListener('keydown', reset);
-    window.addEventListener('pagehide', lock);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('pointerdown', reset);
-      window.removeEventListener('keydown', reset);
-      window.removeEventListener('pagehide', lock);
-    };
-  }, [keys, lock]);
+    if (lockRequested && !operationBusy) lock();
+  }, [lockRequested, operationBusy, lock]);
+  useInactivityLock(Boolean(keys), lock);
+  useEffect(
+    () => () => {
+      unlockAttempt.current++;
+    },
+    [],
+  );
   async function unlock(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
+    const attempt = ++unlockAttempt.current;
     setError('');
     setErrorField(undefined);
     if (!/^\d{6,12}$/.test(pin)) {
-      setError(t('portal.pinInvalid'));
+      setError('Enter a PIN containing 6–12 digits.');
       setErrorField('pin');
       pinInput.current?.focus();
       return;
@@ -73,48 +81,68 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
     setBusy(true);
     try {
       const hasVault = Boolean(await db.meta.get('vault'));
+      if (attempt !== unlockAttempt.current) return;
       setExists(hasVault);
       if (!hasVault && pin !== confirmation) {
-        setError(t('portal.pinMismatch'));
+        setError('The new PIN and confirmation must match.');
         setErrorField('confirmation');
         confirmationInput.current?.focus();
         return;
       }
       const unlocked = await unlockVault(pin);
+      if (attempt !== unlockAttempt.current) return;
       setKeys(unlocked);
       setPin('');
       setConfirmation('');
-      setPersistence(await requestPersistence());
+      void requestPersistence()
+        .then((message) => {
+          if (attempt === unlockAttempt.current) setPersistence(message);
+        })
+        .catch(() => {
+          if (attempt === unlockAttempt.current)
+            setPersistence('Storage persistence could not be checked. Keep encrypted backups.');
+        });
     } catch (error) {
-      setError(errorMessage(error));
+      if (attempt === unlockAttempt.current) setError(errorMessage(error));
     } finally {
-      setBusy(false);
+      if (attempt === unlockAttempt.current) setBusy(false);
     }
   }
   return keys ? (
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{persistence}</p>
-        <button type="button" className="secondary" onClick={lock}>
-          {t('portal.lock')}
+        <button className="secondary" disabled={operationBusy} onClick={lock}>
+          Lock teacher records
         </button>
       </div>
       <TeacherWorkspace keys={keys} onActive={onActive} />
-      <BackupControls keys={keys} />
     </>
   ) : (
-    <div className="mx-auto grid max-w-xl gap-5">
+    <div className="mx-auto grid max-w-md gap-5">
       <form noValidate className="card grid gap-5" onSubmit={unlock} aria-busy={busy}>
         <div>
-          <p className="eyebrow">{t('portal.eyebrow')}</p>
+          <p className="eyebrow">Teacher workspace</p>
           <h2 className="mt-2 text-2xl">
-            {exists === false ? t('portal.protect') : t('portal.unlock')}
+            {error && exists === undefined
+              ? 'Storage unavailable'
+              : exists === undefined
+                ? 'Checking local workspace…'
+                : exists === false
+                  ? 'Create your teacher PIN'
+                  : 'Unlock teacher portal'}
           </h2>
-          <p className="mt-3 text-sm text-slate-600">{t('portal.description')}</p>
+          <p className="mt-3 text-sm text-slate-600">
+            Records stay in this browser. Your Master PIN is never sent to a server.
+          </p>
         </div>
-        <p className="notice">{t('portal.security')}</p>
+        <p className="notice">
+          A short numeric PIN has limited resistance to offline guessing. Use a long random PIN,
+          protect this device, and keep encrypted backups. Encryption alone does not establish legal
+          compliance.
+        </p>
         <label>
-          {t('portal.pin')}
+          Master PIN (6–12 digits)
           <input
             ref={pinInput}
             aria-invalid={errorField === 'pin'}
@@ -133,7 +161,7 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
         </label>
         {exists === false ? (
           <label>
-            {t('portal.confirm')}
+            Confirm new PIN
             <input
               ref={confirmationInput}
               aria-invalid={errorField === 'confirmation'}
@@ -149,21 +177,36 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
           </label>
         ) : null}
         <button className="btn" disabled={busy || exists === undefined}>
-          {busy
-            ? t('portal.unlocking')
-            : exists === undefined
-              ? t('portal.loading')
-              : exists
-                ? t('portal.unlockButton')
-                : t('portal.create')}
+          {busy ? 'Unlocking…' : exists ? 'Unlock teacher workspace' : 'Create encrypted workspace'}
         </button>
+        {error && exists === undefined ? (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              setError('');
+              setRevision((value) => value + 1);
+            }}
+          >
+            Retry storage check
+          </button>
+        ) : null}
         {error ? (
           <p id={`${id}-error`} role="alert" className="notice">
             {error}
           </p>
         ) : null}
       </form>
-      <BackupControls onRestored={restored} />
+      <BackupControls
+        onRestored={() => {
+          setPin('');
+          setConfirmation('');
+          setError('');
+          setExists(undefined);
+          setRevision((value) => value + 1);
+          pinInput.current?.focus();
+        }}
+      />
     </div>
   );
 }

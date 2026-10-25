@@ -21,7 +21,9 @@ export function ScannerView({
   const [error, setError] = useState('');
   const [hasTorch, setHasTorch] = useState(false);
   const [torch, setTorch] = useState(false);
+  const [torchBusy, setTorchBusy] = useState(false);
   const camera = useRef<CameraHandle | undefined>(undefined);
+  const torchOperation = useRef<CameraHandle | undefined>(undefined);
   const latestScan = useRef(onScan);
   latestScan.current = onScan;
   const latestPending = useRef(onPending);
@@ -29,6 +31,10 @@ export function ScannerView({
   const processing = useRef(false);
   const stopPromise = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
+    setHasTorch(false);
+    setTorch(false);
+    setTorchBusy(false);
+    torchOperation.current = undefined;
     if (!running || paused) return;
     let disposed = false;
     const debounce = new ContinuousScanGate();
@@ -76,8 +82,17 @@ export function ScannerView({
         camera.current = handle;
         setHasTorch(handle.hasTorch);
         setTorch(false);
-        const available = await navigator.mediaDevices.enumerateDevices();
-        if (!disposed) setDevices(available.filter((item) => item.kind === 'videoinput'));
+        // Enumeration is optional: failure must not stop a working scanner.
+        // Never await this advisory query: a stalled permission API must not
+        // hold startup/cleanup open and leave the camera running after Stop.
+        void Promise.resolve()
+          .then(() => navigator.mediaDevices.enumerateDevices())
+          .then((available) => {
+            if (!disposed) setDevices(available.filter((item) => item.kind === 'videoinput'));
+          })
+          .catch(() => {
+            if (!disposed) setDevices([]);
+          });
       } catch (error) {
         if (!disposed) {
           setError(t('scanner.unavailable', { error: errorMessage(error) }));
@@ -95,11 +110,21 @@ export function ScannerView({
     };
   }, [running, device, fallback, hostId, paused]);
   async function toggleTorch() {
+    const handle = camera.current;
+    if (!handle || !handle.hasTorch || torchOperation.current) return;
+    const next = !torch;
+    torchOperation.current = handle;
+    setTorchBusy(true);
     try {
-      await camera.current?.torch(!torch);
-      setTorch((value) => !value);
+      await handle.torch(next);
+      if (camera.current === handle) setTorch(next);
     } catch {
-      setError(t('scanner.torchUnavailable'));
+      if (camera.current === handle) setError(t('scanner.torchUnavailable'));
+    } finally {
+      if (torchOperation.current === handle) {
+        torchOperation.current = undefined;
+        setTorchBusy(false);
+      }
     }
   }
   return (
@@ -123,6 +148,7 @@ export function ScannerView({
             type="button"
             className="secondary"
             aria-pressed={torch}
+            disabled={torchBusy}
             onClick={() => void toggleTorch()}
           >
             {torch ? t('scanner.torchOff') : t('scanner.torchOn')}

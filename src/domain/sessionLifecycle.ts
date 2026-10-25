@@ -1,3 +1,4 @@
+import { teacherOperation } from './operations';
 import { db } from '../db/db';
 import { decrypt, encrypt } from '../db/crypto';
 import {
@@ -8,8 +9,7 @@ import {
   validateReason,
 } from './audit';
 import type { AttendancePrivate, Session, SessionPrivate, VaultKeys } from '../types';
-
-export async function closeSession(keys: VaultKeys, supplied: Session): Promise<void> {
+async function closeSessionInternal(keys: VaultKeys, supplied: Session): Promise<void> {
   const stored = await db.sessions.get(supplied.id);
   if (!stored || stored.state !== 'ACTIVE') throw new Error('Session is already closed.');
   const session = await decrypt<SessionPrivate>(
@@ -27,7 +27,13 @@ export async function closeSession(keys: VaultKeys, supplied: Session): Promise<
       studentToken: student.token,
       encrypted: await encrypt(
         keys.encryption,
-        { status: 'ABSENT', at, source: 'SYSTEM', reason: 'Not recorded at session closure' },
+        {
+          status: 'ABSENT',
+          at,
+          source: 'SYSTEM',
+          absenceOrigin: 'CLOSURE',
+          reason: 'Not recorded at session closure',
+        },
         `attendance:${stored.id}:${student.token}`,
       ),
     })),
@@ -52,8 +58,7 @@ export async function closeSession(keys: VaultKeys, supplied: Session): Promise<
     await db.scanEvents.add(event);
   });
 }
-
-export async function reopenSession(
+async function reopenSessionInternal(
   keys: VaultKeys,
   sessionId: string,
   reason: string,
@@ -79,7 +84,9 @@ export async function reopenSession(
     if (
       entry.status === 'ABSENT' &&
       (entry.source === 'SYSTEM' ||
-        (entry.source === 'MANUAL' && entry.reason === 'Not recorded at session closure'))
+        (entry.source === 'MANUAL' &&
+          entry.absenceOrigin === undefined &&
+          entry.reason === 'Not recorded at session closure'))
     )
       automatic.push(row.studentToken);
   }
@@ -108,3 +115,5 @@ export async function reopenSession(
     await db.scanEvents.add(event);
   });
 }
+export const closeSession = teacherOperation(closeSessionInternal);
+export const reopenSession = teacherOperation(reopenSessionInternal);

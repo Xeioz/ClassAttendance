@@ -5,13 +5,27 @@
 @layer base {
   body {
     @apply m-0 bg-paper text-ink antialiased;
-    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-    overflow-wrap: anywhere;
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    line-height: 1.5;
   }
   h1,
   h2,
   h3 {
     @apply font-semibold tracking-tight;
+  }
+  h1,
+  h2,
+  h3,
+  p,
+  li,
+  button,
+  td {
+    overflow-wrap: anywhere;
   }
   button,
   input,
@@ -20,18 +34,18 @@
     @apply min-h-12 rounded-lg;
   }
   button {
-    @apply font-semibold;
-    white-space: normal;
+    @apply cursor-pointer font-semibold;
   }
   input,
   select,
   textarea {
     @apply w-full border border-slate-400 bg-white px-3 py-2 text-ink;
-    min-inline-size: 0;
   }
   label {
     @apply grid gap-2 text-sm font-semibold;
-    min-inline-size: 0;
+  }
+  input[aria-invalid='true'] {
+    @apply border-2 border-amber-700 bg-amber-50;
   }
   :focus-visible {
     outline: 3px solid #1d4ed8;
@@ -43,7 +57,7 @@
 }
 @layer components {
   .card {
-    @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7;
+    @apply rounded-2xl border border-slate-200 bg-white p-5 sm:p-6;
   }
   .btn {
     @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-forest px-5 py-3 text-sm text-white hover:bg-emerald-950;
@@ -57,6 +71,70 @@
   .notice {
     @apply rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950;
   }
+  .landing-intro {
+    @apply mx-auto max-w-2xl py-6 text-center sm:py-10;
+  }
+  .role-card {
+    @apply grid gap-3 p-7;
+  }
+  .role-card > span {
+    @apply mt-0;
+  }
+  .role-symbol {
+    @apply flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-2xl text-forest;
+  }
+  .student-layout {
+    @apply mx-auto grid max-w-4xl items-start gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)];
+  }
+  .student-layout > section {
+    @apply w-full;
+  }
+  .student-help {
+    @apply mx-auto w-full max-w-md;
+  }
+  .workspace-sidebar {
+    @apply border-slate-200 bg-white lg:sticky lg:top-5;
+  }
+  .workspace-tabs {
+    @apply gap-4 border-b border-slate-200;
+  }
+  .workspace-tabs > button {
+    @apply rounded-none border-0 border-b-2 border-transparent bg-transparent px-1 py-3 text-slate-600;
+  }
+  .workspace-tabs > button[aria-current='page'] {
+    @apply border-forest text-forest;
+  }
+  .stepbar {
+    @apply flex flex-wrap gap-2;
+  }
+  .stepbar > li {
+    @apply rounded-lg bg-paper px-3 py-2 text-sm text-slate-600;
+  }
+  .stepbar > li[aria-current='step'] {
+    @apply bg-forest font-semibold text-white;
+  }
+  .metric {
+    @apply rounded-xl border border-slate-200 bg-white p-4;
+  }
+  .field-error {
+    @apply text-sm font-normal text-amber-900;
+  }
+  .table-scroll {
+    @apply overflow-x-auto;
+  }
+}
+table {
+  border-collapse: collapse;
+}
+thead {
+  background: #f5f6f2;
+}
+th {
+  color: #52655e;
+  font-size: 0.75rem;
+}
+td {
+  vertical-align: top;
 }
 video {
   max-width: 100%;

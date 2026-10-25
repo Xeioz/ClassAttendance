@@ -230,11 +230,17 @@ function DisputeRow({
       <p className="font-semibold">{name}</p>
       <p className="text-sm">
         {t('dispute.first', {
-          time: event.firstAt ? new Date(event.firstAt).toLocaleString() : t('dispute.unknown'),
+          time:
+            event.firstAt !== undefined
+              ? new Date(event.firstAt).toLocaleString()
+              : t('dispute.unknown'),
         })}
         <br />
         {t('dispute.second', {
-          time: event.secondAt ? new Date(event.secondAt).toLocaleString() : t('dispute.unknown'),
+          time:
+            event.secondAt !== undefined
+              ? new Date(event.secondAt).toLocaleString()
+              : t('dispute.unknown'),
         })}
       </p>
       <p className="text-sm">{event.reason}</p>

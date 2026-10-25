@@ -17,6 +17,8 @@ jobs:
           version: 11.25.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - run: pnpm build
+      - run: pnpm check:budgets
       - name: Generate and reconcile synthetic exports
         run: pnpm qa:exports
       - uses: actions/setup-python@v5
@@ -26,9 +28,9 @@ jobs:
         run: |
           python -m pip install -r scripts/qa-requirements.txt
           python scripts/verify-qa-exports.py
-      - run: pnpm build
       - name: Build for repository subpath
         run: pnpm build --base=/ClassAttendance/
+      - run: pnpm check:budgets
       - name: Retain synthetic workbook validation evidence
         if: always()
         uses: actions/upload-artifact@v4

@@ -1,3 +1,4 @@
+import { verifyOfflineResources } from '../utils/offline';
 import { t } from '../i18n';
 import { errorMessage } from '../utils/errors';
 
@@ -32,42 +33,7 @@ function setOfflineEvidence(next: OfflineEvidence) {
 
 /** Read cached responses, never infer offline support from network availability. */
 export async function inspectOfflineResources(): Promise<number> {
-  if (!navigator.serviceWorker || typeof caches === 'undefined')
-    throw new Error(t('readiness.offline.unsupported'));
-  const registration = await navigator.serviceWorker.getRegistration();
-  const resourceBase = new URL(import.meta.env.BASE_URL || '/', location.href);
-  if (!registration?.active || !resourceBase.href.startsWith(registration.scope))
-    throw new Error(t('readiness.offline.inactive'));
-  const response = await caches.match(new URL('offline-assets.json', resourceBase), {
-    ignoreSearch: true,
-  });
-  if (!response?.ok) throw new Error(t('readiness.offline.noChecklist'));
-  const files: unknown = await response.json();
-  if (
-    !Array.isArray(files) ||
-    files.length === 0 ||
-    !files.every(
-      (file) =>
-        typeof file === 'string' &&
-        file.length > 0 &&
-        !file.startsWith('/') &&
-        !file.split('/').includes('..'),
-    ) ||
-    !files.some((file: string) => file === 'index.html') ||
-    !files.some((file: string) => /\.js$/.test(file))
-  )
-    throw new Error(t('readiness.offline.invalidChecklist'));
-  const urls = (files as string[]).map((file) => new URL(file, resourceBase));
-  if (
-    urls.some(
-      (url) =>
-        url.origin !== resourceBase.origin || !url.pathname.startsWith(resourceBase.pathname),
-    )
-  )
-    throw new Error(t('readiness.offline.invalidChecklist'));
-  const matches = await Promise.all(urls.map((url) => caches.match(url, { ignoreSearch: true })));
-  if (!matches.every((match) => match?.ok)) throw new Error(t('readiness.offline.missing'));
-  return urls.length;
+  return verifyOfflineResources();
 }
 
 export async function refreshOfflineEvidence() {

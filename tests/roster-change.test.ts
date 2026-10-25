@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { readRosterSnapshot } from '../src/domain/rosterSnapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/db/db';
 import { unlockVault } from '../src/db/vault';
@@ -133,7 +134,9 @@ describe('reviewed roster changes', () => {
   it('rejects stale reviewed data and allows a refreshed comparison to be reviewed again', async () => {
     await saveRoster(keys, initial);
     const earlier = await review('00-1,Approved Later,A');
-    await saveRoster(keys, [{ ...initial[0], name: 'Changed in another tab' }]);
+    await saveRoster(keys, [{ ...initial[0], name: 'Changed in another tab' }], {
+      expectedVersion: (await readRosterSnapshot(keys)).version,
+    });
     const before = await db.students.toArray();
     await expect(commitRosterImport(keys, earlier, new Set([2]))).rejects.toBeInstanceOf(
       StaleRosterPreviewError,
