@@ -91,7 +91,9 @@ describe('attendance transactions', () => {
       'EXCUSED',
     );
     await closeSession(keys, session);
-    await saveRoster(keys, [{ id: '2024-001', name: 'New Name', section: 'A' }]);
+    await expect(
+      saveRoster(keys, [{ id: '2024-001', name: 'New Name', section: 'A' }]),
+    ).rejects.toThrow('Name conflict');
     expect((await listSessions(keys))[0].roster.find((row) => row.id === '2024001')?.name).toBe(
       'Peña, José',
     );

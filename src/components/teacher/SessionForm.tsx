@@ -1,544 +1,198 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { SessionReadiness } from './SessionReadiness';
+import { navigate } from '../../hooks/route';
+import { useState, type FormEvent } from 'react';
 import { createSession } from '../../domain/attendance';
-import {
-  ClassSettingsValidationError,
-  validateClassSettings,
-  validateTemplateName,
-} from '../../domain/classSettings';
-import {
-  deleteTemplate,
-  duplicateTemplate,
-  listTemplates,
-  saveTemplate,
-} from '../../domain/templates';
-import { t } from '../../i18n';
 import { errorMessage } from '../../utils/errors';
-import { sectionKey } from '../../utils/normalize';
-import type { ClassSettings, ClassTemplate, Session, Student, VaultKeys } from '../../types';
-import { PreClassReadiness } from './PreClassReadiness';
-
-function localMinute(date = new Date()): string {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-}
-function initialSettings(): ClassSettings {
-  return {
-    course: '',
-    section: '',
-    graceMinutes: 15,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  };
-}
-type FormError = { field?: string; message: string };
+import type { ClassOffering, Session, Student, VaultKeys } from '../../types';
 
 export function SessionForm({
   keys,
   sections,
-  students = [],
-  activeSession,
-  rosterReviewPending = false,
-  rosterReviewIssues = 0,
-  onRosterChanged,
-  onReviewActiveSession,
   onCreated,
+  offering,
+  roster,
 }: {
   keys: VaultKeys;
+  offering?: ClassOffering;
+  roster?: Student[];
   sections: string[];
-  students?: Student[];
-  activeSession?: Session;
-  rosterReviewPending?: boolean;
-  rosterReviewIssues?: number;
-  onRosterChanged?: () => Promise<void>;
-  onReviewActiveSession?: () => void;
   onCreated: (session: Session) => Promise<void>;
 }) {
-  const id = useId();
-  const formRef = useRef<HTMLFormElement>(null);
-  const [settings, setSettings] = useState<ClassSettings>(initialSettings);
-  const [templates, setTemplates] = useState<ClassTemplate[]>([]);
-  const [selected, setSelected] = useState<ClassTemplate>();
-  const [sectionEdited, setSectionEdited] = useState(false);
-  const [name, setName] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [removing, setRemoving] = useState<ClassTemplate>();
-  const [pin, setPin] = useState('');
-  const [start, setStart] = useState(localMinute);
-  const [error, setError] = useState<FormError>();
-  const [message, setMessage] = useState('');
+  const [course, setCourse] = useState(offering?.course ?? '');
+  const [institution, setInstitution] = useState(offering?.institution ?? '');
+  const [subject, setSubject] = useState(offering?.subject ?? '');
+  const [room, setRoom] = useState(offering?.room ?? '');
+  const [section, setSection] = useState(offering?.section ?? '');
+  const [pin, setPin] = useState(() =>
+    String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)),
+  );
+  const [grace, setGrace] = useState(offering?.graceMinutes ?? 15);
+  const [start, setStart] = useState(() => {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  });
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const sectionInput = settings.section || (!sectionEdited ? sections[0] || '' : '');
-  const section = sectionKey(sectionInput);
-  const selectedId = selected?.id ?? '';
-  const rosterCount = students.filter((student) => student.section === section).length;
-  const sectionMissing = !!section && !sections.includes(section);
-  const startsAt = new Date(start).getTime();
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    listTemplates(keys)
-      .then((result) => {
-        if (!cancelled) setTemplates(result);
-      })
-      .catch((cause: unknown) => {
-        if (!cancelled) setError({ message: errorMessage(cause) });
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [keys]);
-
-  function focusField(field: string) {
-    const control = formRef.current?.elements.namedItem(field);
-    if (control instanceof HTMLElement) control.focus();
-  }
-  function showError(cause: unknown) {
-    const problem =
-      cause instanceof ClassSettingsValidationError
-        ? { field: cause.field, message: cause.message }
-        : cause &&
-            typeof cause === 'object' &&
-            'message' in cause &&
-            typeof cause.message === 'string'
-          ? (cause as FormError)
-          : { message: errorMessage(cause) };
-    setError(problem);
-    if (problem.field) focusField(problem.field);
-  }
-  function edit<K extends keyof ClassSettings>(field: K, value: ClassSettings[K]) {
-    if (field === 'section') setSectionEdited(true);
-    setSettings((current) => ({ ...current, [field]: value }));
-    setError(undefined);
-    setMessage('');
-  }
-  function useTemplate(template?: ClassTemplate) {
-    setSelected(template);
-    setSectionEdited(!!template);
-    setName(template?.name ?? '');
-    setSettings(template ? { ...template.settings } : initialSettings());
-    setPin('');
-    setStart(localMinute());
-    setError(undefined);
-    setMessage(template ? t('templates.loaded', { name: template.name }) : '');
-    setRemoving(undefined);
-  }
-  async function refreshTemplates() {
-    setTemplates(await listTemplates(keys));
-  }
-  async function save(update: boolean) {
-    setError(undefined);
-    setMessage('');
-    try {
-      const templateName = validateTemplateName(name);
-      const validated = validateClassSettings({ ...settings, section });
-      setBusy(true);
-      const saved = await saveTemplate(keys, {
-        id: update ? selectedId : undefined,
-        expectedUpdatedAt: update ? selected?.updatedAt : undefined,
-        name: templateName,
-        settings: validated,
-      });
-      await refreshTemplates();
-      setSelected(saved);
-      setSectionEdited(true);
-      setName(saved.name);
-      setSettings({ ...saved.settings });
-      setMessage(t(update ? 'templates.updated' : 'templates.saved', { name: saved.name }));
-    } catch (cause) {
-      showError(cause);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function duplicate() {
-    if (!selected) return;
-    setError(undefined);
-    setMessage('');
-    setBusy(true);
-    try {
-      const copy = await duplicateTemplate(keys, selected.id);
-      await refreshTemplates();
-      useTemplate(copy);
-      setMessage(t('templates.duplicated', { name: copy.name }));
-    } catch (cause) {
-      showError(cause);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function reloadSelected() {
-    setBusy(true);
-    setError(undefined);
-    try {
-      const latest = await listTemplates(keys);
-      setTemplates(latest);
-      useTemplate(latest.find((template) => template.id === selectedId));
-    } catch (cause) {
-      showError(cause);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function remove() {
-    if (!removing) return;
-    setError(undefined);
-    setMessage('');
-    setBusy(true);
-    try {
-      await deleteTemplate(keys, removing.id, removing.updatedAt);
-      await refreshTemplates();
-      setSelected(undefined);
-      setRemoving(undefined);
-      setMessage(t('templates.removed', { name: removing.name }));
-    } catch (cause) {
-      showError(cause);
-    } finally {
-      setBusy(false);
-    }
-  }
-  useEffect(() => {
-    if (removing) focusField('keepTemplate');
-  }, [removing]);
-  useEffect(() => {
-    if (error?.field && !busy) focusField(error.field);
-  }, [error, busy]);
-  const previousRemoval = useRef(false);
-  useEffect(() => {
-    if (previousRemoval.current && !removing && !busy) focusField('savedTemplate');
-    if (!busy) previousRemoval.current = !!removing;
-  }, [removing, busy]);
-
-  function configurationError(): FormError | undefined {
-    try {
-      validateClassSettings({ ...settings, section });
-    } catch (cause) {
-      return {
-        field: cause instanceof ClassSettingsValidationError ? cause.field : undefined,
-        message: errorMessage(cause),
-      };
-    }
-    if (!Number.isFinite(startsAt) || localMinute(new Date(startsAt)) !== start)
-      return { field: 'startsAt', message: t('templates.invalidStart') };
-    if (!/^\d{3,6}$/.test(pin)) return { field: 'roomPin', message: t('templates.invalidPin') };
-  }
-  const configProblem = configurationError();
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy || removing) return;
-    setError(undefined);
-    setMessage('');
-    if (activeSession) {
-      showError({ message: t('templates.activeSession') });
-      return;
-    }
-    if (rosterReviewPending) {
-      showError({ message: t('templates.pendingRoster') });
-      return;
-    }
-    if (configProblem) {
-      showError(configProblem);
-      return;
-    }
-    if (sectionMissing || !rosterCount) {
-      showError({ field: 'section', message: t('templates.emptySection', { section }) });
-      return;
-    }
     setBusy(true);
+    setError('');
     try {
       const session = await createSession(
         keys,
         {
-          ...validateClassSettings({ ...settings, section }),
+          classId: offering?.id,
+          timezone: offering?.timezone,
+          institution: institution.trim(),
+          subject: subject.trim(),
+          room: room.trim(),
+          course,
+          section: section || sections[0] || '',
           roomPin: pin,
-          startsAt,
+          startsAt: new Date(start).getTime(),
+          graceMinutes: grace,
         },
-        { expectedRoster: students },
+        { expectedRoster: roster },
       );
-      setPin('');
-      setStart(localMinute());
-      setMessage(t('templates.sessionCreated'));
       await onCreated(session);
-    } catch (cause) {
-      if (
-        cause &&
-        typeof cause === 'object' &&
-        'code' in cause &&
-        cause.code === 'ROSTER_CHANGED'
-      ) {
-        try {
-          await onRosterChanged?.();
-        } catch {
-          /* Keep the actionable original conflict; never automatically retry creation. */
-        }
-      }
-      showError(cause);
+    } catch (error) {
+      setError(errorMessage(error));
     } finally {
       setBusy(false);
     }
   }
-  function fieldProps(field: string) {
-    return {
-      id: `${id}-${field}`,
-      name: field,
-      'aria-invalid': error?.field === field || undefined,
-      'aria-describedby': error?.field === field ? `${id}-error` : undefined,
-    };
-  }
-  const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const controlsDisabled = busy || !!removing;
-
   return (
-    <form
-      ref={formRef}
-      onSubmit={submit}
-      noValidate
-      className="card grid gap-4"
-      aria-labelledby={`${id}-heading`}
-    >
+    <form onSubmit={submit} className="card grid gap-4">
       <div>
-        <p className="eyebrow">{t('templates.beforeScanning')}</p>
-        <h2 id={`${id}-heading`} className="mt-2 text-xl">
-          {t('templates.heading')}
-        </h2>
+        <p className="eyebrow">Before scanning</p>
+        <h2 className="mt-2 text-xl">Start a class session</h2>
       </div>
-      <fieldset
-        disabled={controlsDisabled || loading}
-        className="grid gap-3 rounded-xl border border-slate-300 p-4"
-      >
-        <legend className="px-1 font-semibold">{t('templates.savedHeading')}</legend>
-        <p className="text-sm text-slate-600">{t('templates.description')}</p>
-        <label htmlFor={`${id}-savedTemplate`}>
-          {t('templates.choose')}
-          <select
-            {...fieldProps('savedTemplate')}
-            value={selectedId}
-            onChange={(event) =>
-              useTemplate(templates.find((item) => item.id === event.target.value))
-            }
-          >
-            <option value="">{loading ? t('templates.loading') : t('templates.noTemplate')}</option>
-            {templates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label htmlFor={`${id}-name`}>
-          {t('templates.name')}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label>
+          Institution (optional)
           <input
-            {...fieldProps('name')}
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value);
-              setError(undefined);
-              setMessage('');
-            }}
-            maxLength={100}
+            value={institution}
+            onChange={(event) => setInstitution(event.target.value)}
+            maxLength={150}
           />
         </label>
-        <p className="text-sm text-slate-600">{t('templates.editHelp')}</p>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn secondary" onClick={() => void save(false)}>
-            {t(selected ? 'templates.saveAsNew' : 'templates.saveNew')}
-          </button>
-          {selected ? (
-            <>
-              <button type="button" className="btn secondary" onClick={() => void save(true)}>
-                {t('templates.update')}
-              </button>
-              <button type="button" className="btn secondary" onClick={() => void reloadSelected()}>
-                {t('templates.reload')}
-              </button>
-              <button type="button" className="btn secondary" onClick={() => void duplicate()}>
-                {t('templates.duplicate')}
-              </button>
-              <button type="button" className="btn secondary" onClick={() => setRemoving(selected)}>
-                {t('templates.remove')}
-              </button>
-            </>
-          ) : null}
-        </div>
-        {selected ? <p className="text-sm text-slate-600">{t('templates.duplicateHelp')}</p> : null}
-      </fieldset>
-      {removing ? (
-        <div className="notice grid gap-3" role="group" aria-labelledby={`${id}-remove-heading`}>
-          <p id={`${id}-remove-heading`}>{t('templates.removePrompt', { name: removing.name })}</p>
-          <p>{t('templates.removeHelp')}</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              name="keepTemplate"
-              type="button"
-              className="btn secondary"
-              disabled={busy}
-              onClick={() => setRemoving(undefined)}
-            >
-              {t('templates.keep')}
-            </button>
-            <button
-              type="button"
-              className="btn secondary"
-              disabled={busy}
-              onClick={() => void remove()}
-            >
-              {t('templates.confirmRemove')}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      <fieldset disabled={controlsDisabled} className="grid gap-4">
-        <legend className="mb-3 font-semibold">{t('templates.settingsHeading')}</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(['institution', 'subject', 'room', 'course'] as const).map((field) => (
-            <label key={field} htmlFor={`${id}-${field}`}>
-              {t(`templates.${field}`)}
-              <input
-                {...fieldProps(field)}
-                value={settings[field] ?? ''}
-                onChange={(event) => edit(field, event.target.value)}
-                maxLength={field === 'course' ? 100 : 150}
-                required={field === 'course'}
-              />
-            </label>
-          ))}
-          <label htmlFor={`${id}-section`}>
-            {t('templates.section')}
-            <input
-              {...fieldProps('section')}
-              value={sectionInput}
-              onChange={(event) => edit('section', event.target.value)}
-              list={`${id}-sections`}
-              maxLength={100}
-              required
-              aria-describedby={[
-                `${id}-section-help`,
-                error?.field === 'section' ? `${id}-error` : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            />
-            <datalist id={`${id}-sections`}>
-              {sections.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-          </label>
-          <label htmlFor={`${id}-graceMinutes`}>
-            {t('templates.grace')}
-            <input
-              {...fieldProps('graceMinutes')}
-              type="number"
-              min="0"
-              max="180"
-              step="1"
-              value={Number.isNaN(settings.graceMinutes) ? '' : settings.graceMinutes}
-              onChange={(event) =>
-                edit('graceMinutes', event.target.value === '' ? NaN : Number(event.target.value))
-              }
-              required
-            />
-          </label>
-          <label htmlFor={`${id}-timezone`}>
-            {t('templates.timezone')}
-            <input
-              {...fieldProps('timezone')}
-              value={settings.timezone}
-              onChange={(event) => edit('timezone', event.target.value)}
-              placeholder="Asia/Manila"
-              aria-describedby={[
-                `${id}-timezone-help`,
-                error?.field === 'timezone' ? `${id}-error` : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            />
-          </label>
-        </div>
-        <p id={`${id}-section-help`} className="text-sm text-slate-600">
-          {t('templates.sectionHelp')}
-          {sectionMissing ? ` ${t('templates.unavailableSection', { section })}.` : ''}
-        </p>
-        <p id={`${id}-timezone-help`} className="text-sm text-slate-600">
-          {t('templates.timezoneHelp', { timezone: deviceTimezone })}
-        </p>
-      </fieldset>
-      <fieldset disabled={controlsDisabled || !!activeSession} className="grid gap-4">
-        <legend className="mb-3 font-semibold">{t('templates.sessionHeading')}</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label htmlFor={`${id}-roomPin`}>
-            {t('templates.pin')}
-            <input
-              {...fieldProps('roomPin')}
-              value={pin}
-              onChange={(event) => {
-                setPin(event.target.value);
-                setError(undefined);
-              }}
-              inputMode="numeric"
-              maxLength={6}
-              pattern="[0-9]{3,6}"
-              placeholder={t('templates.pinPlaceholder')}
-              required
-              autoComplete="off"
-            />
-          </label>
-          <label htmlFor={`${id}-startsAt`}>
-            {t('templates.start')}
-            <input
-              {...fieldProps('startsAt')}
-              type="datetime-local"
-              value={start}
-              onChange={(event) => {
-                setStart(event.target.value);
-                setError(undefined);
-              }}
-              required
-            />
-          </label>
-        </div>
-        <p className="text-sm text-slate-600">{t('templates.freshSession')}</p>
-      </fieldset>
-      <PreClassReadiness
-        config={{ ...settings, section, startsAt, roomPin: pin }}
-        rosterCount={rosterCount}
-        rosterIssues={rosterReviewIssues}
-        rosterReviewPending={rosterReviewPending}
-        activeSession={activeSession}
-        vaultId={keys.salt}
-        configurationErrors={configProblem ? [configProblem.message] : []}
-        onReviewConfiguration={() =>
-          focusField(activeSession ? 'course' : (configProblem?.field ?? 'course'))
-        }
-        onReviewRoster={() => {
-          const file = document.querySelector<HTMLInputElement>(
-            'input[type="file"][accept*=".csv"]',
-          );
-          if (file && !file.disabled) file.focus();
-          else document.getElementById('class-roster')?.focus();
-        }}
-        onReviewActiveSession={onReviewActiveSession}
-      />
-      <p className="text-sm text-slate-600">
-        {t('templates.review', { count: rosterCount, section: section || '—' })}
-      </p>
-      {activeSession ? <p className="notice">{t('templates.activeSession')}</p> : null}
-      {rosterReviewPending ? <p className="notice">{t('templates.pendingRoster')}</p> : null}
+        <label>
+          Subject (optional)
+          <input
+            value={subject}
+            onChange={(event) => setSubject(event.target.value)}
+            maxLength={150}
+          />
+        </label>
+        <label>
+          Room (optional)
+          <input value={room} onChange={(event) => setRoom(event.target.value)} maxLength={150} />
+        </label>
+        <label>
+          Course
+          <input
+            readOnly={Boolean(offering)}
+            value={course}
+            onChange={(event) => setCourse(event.target.value)}
+            placeholder="IT 101"
+            maxLength={100}
+            required
+          />
+        </label>
+        <label>
+          Section
+          <select
+            disabled={Boolean(offering)}
+            value={section || sections[0] || ''}
+            onChange={(event) => setSection(event.target.value)}
+            required
+          >
+            {!sections.length ? (
+              <option value="">Import a roster first</option>
+            ) : (
+              sections.map((item) => <option key={item}>{item}</option>)
+            )}
+          </select>
+        </label>
+        <label>
+          Room challenge
+          <input
+            value={pin}
+            onChange={(event) => setPin(event.target.value)}
+            inputMode="numeric"
+            maxLength={6}
+            pattern="[0-9]{3,6}"
+            placeholder="3–6 digits"
+            required
+          />
+        </label>
+        <label>
+          Start time (this device's timezone)
+          <input
+            type="datetime-local"
+            value={start}
+            onChange={(event) => setStart(event.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Grace period in minutes
+          <input
+            type="number"
+            min="0"
+            max="180"
+            step="1"
+            value={grace}
+            onChange={(event) => setGrace(Number(event.target.value))}
+            required
+          />
+        </label>
+      </div>
       <button
-        className="btn justify-self-start"
-        disabled={controlsDisabled || !!activeSession || rosterReviewPending || !sections.length}
+        type="button"
+        className="secondary justify-self-start"
+        onClick={() =>
+          setPin(String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)))
+        }
       >
-        {busy ? t('templates.working') : t('templates.createSession')}
+        Generate another challenge
+      </button>
+      <p className="text-sm text-slate-600">
+        Report timezone: {offering?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}.
+        Late means saved after start + grace. Use a reasoned correction for students already waiting
+        at the cutoff.
+      </p>
+      <details>
+        <summary className="min-h-12 cursor-pointer py-3 font-semibold">
+          Device and session readiness
+        </summary>
+        <SessionReadiness
+          config={{
+            course,
+            section: section || sections[0] || '',
+            institution,
+            subject,
+            room,
+            roomPin: pin,
+            startsAt: new Date(start).getTime(),
+            graceMinutes: grace,
+            timezone: offering?.timezone,
+          }}
+          rosterCount={roster?.length ?? 0}
+          vaultId={keys.salt}
+          onReviewRoster={() => {
+            if (offering) navigate(`/teacher/classes/${offering.id}/roster`);
+          }}
+        />
+      </details>
+      <button className="btn justify-self-start" disabled={busy || !sections.length}>
+        {busy ? 'Creating…' : 'Create attendance session'}
       </button>
       {error ? (
-        <p id={`${id}-error`} role="alert" className="notice">
-          {error.message}
+        <p role="alert" className="notice">
+          {error}
         </p>
       ) : null}
-      <p role="status" className="text-sm text-slate-600">
-        {message}
-      </p>
     </form>
   );
 }

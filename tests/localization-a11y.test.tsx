@@ -10,11 +10,10 @@ import { createTranslator, resources, supportedLocales, t } from '../src/i18n';
 import { AccessibleHUD } from '../src/components/common/AccessibleHUD';
 import { ManualEntryDialog } from '../src/components/teacher/ManualEntryDialog';
 import { TeacherPortal } from '../src/components/teacher/TeacherPortal';
-import { TeacherWorkspace } from '../src/components/teacher/TeacherWorkspace';
 import { StudentPass } from '../src/components/student/StudentPass';
 import { db } from '../src/db/db';
 import { unlockVault } from '../src/db/vault';
-import { closeSession, createSession, getAttendance, saveRoster } from '../src/domain/attendance';
+import { createSession, getAttendance, saveRoster } from '../src/domain/attendance';
 import type { Session, VaultKeys } from '../src/types';
 
 const defaultExcusedLabel = resources.en['status.EXCUSED'];
@@ -139,31 +138,6 @@ describe('offline localization fallback', () => {
 });
 
 describe('accessible feedback and validation', () => {
-  it('reviews and focuses the active session when history currently shows a closed session', async () => {
-    const { keys, session: historical } = await classroom();
-    await closeSession(keys, historical);
-    const active = await createSession(keys, {
-      course: 'Active classroom',
-      section: 'A',
-      roomPin: '492',
-      startsAt: Date.now(),
-      graceMinutes: 15,
-    });
-    render(<TeacherWorkspace keys={keys} onActive={() => {}} />);
-    await screen.findByRole('heading', { name: 'Active classroom / A' });
-    const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText('Session history'), historical.id);
-    await screen.findByRole('heading', { name: 'IT301 / A' });
-    await user.click(screen.getByText(t('workspace.preparation')));
-    await user.click(await screen.findByRole('button', { name: 'Review active session' }));
-    await screen.findByRole('heading', { name: 'Active classroom / A' });
-    await waitFor(() =>
-      expect(document.activeElement).toBe(document.getElementById('active-session')),
-    );
-    expect((screen.getByLabelText('Session history') as HTMLSelectElement).value).toBe(active.id);
-    expect(screen.getByRole('button', { name: 'Manual check-in / correction (F2)' })).toBeTruthy();
-  });
-
   it('announces processing without repeating a previous saved result, then exposes each result as text', () => {
     const view = render(
       <AccessibleHUD result={{ kind: 'valid', title: 'Attendance saved', detail: 'Student A' }} />,

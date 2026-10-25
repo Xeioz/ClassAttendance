@@ -255,7 +255,7 @@ describe('encrypted class template persistence', () => {
     const upgraded = new AttendanceDatabase(name);
     try {
       await upgraded.open();
-      expect(upgraded.verno).toBe(2);
+      expect(upgraded.verno).toBe(3);
       expect(await upgraded.classTemplates.toArray()).toEqual([]);
       for (const table of tableNames)
         expect(await upgraded.table(table).toArray()).toEqual(original[table]);
@@ -267,7 +267,7 @@ describe('encrypted class template persistence', () => {
 });
 
 describe('version-aware template backup recovery', () => {
-  it('exports v2 with templates and restores every record and original encrypted value', async () => {
+  it('exports v3 with templates and restores every record and original encrypted value', async () => {
     await history();
     const template = await saveTemplate(keys, { name: 'Tuesday class', settings });
     const before = await snapshot();
@@ -277,8 +277,8 @@ describe('version-aware template backup recovery', () => {
       payload: Cipher;
       meta: VaultMeta;
     };
-    expect(envelope.v).toBe(2);
-    const data = await decrypt<BackupData>(keys.encryption, envelope.payload, 'backup:v2');
+    expect(envelope.v).toBe(3);
+    const data = await decrypt<BackupData>(keys.encryption, envelope.payload, 'backup:v3');
     expect(data.classTemplates).toEqual(before.classTemplates);
     await expect(decrypt(keys.encryption, envelope.payload, 'backup:v1')).rejects.toThrow();
     await db.transaction('rw', db.tables, async () => {
@@ -328,8 +328,10 @@ describe('version-aware template backup recovery', () => {
     await saveTemplate(keys, { name: 'Keep this template', settings });
     const before = await snapshot();
     const { classTemplates: _templates, ...missing } = before;
-    await expect(restoreBackup(await backupFile(missing), pin)).rejects.toThrow('classTemplates');
-    await expect(restoreBackup(await backupFile(before, 1), pin)).rejects.toThrow('version 2');
+    await expect(restoreBackup(await backupFile(missing), pin)).rejects.toThrow('ambiguous');
+    await expect(restoreBackup(await backupFile(before, 1), pin)).rejects.toThrow(
+      'unexpected legacy tables',
+    );
     await expect(
       validateBackupData(
         { ...before, classTemplates: [...before.classTemplates, ...before.classTemplates] },
@@ -338,7 +340,7 @@ describe('version-aware template backup recovery', () => {
       ),
     ).rejects.toThrow(/duplicate/);
     const envelope = JSON.parse(await (await capturedExport()).text());
-    envelope.v = 3;
+    envelope.v = 99;
     await expect(
       restoreBackup(new File([JSON.stringify(envelope)], 'unsupported.json'), pin),
     ).rejects.toThrow('format');

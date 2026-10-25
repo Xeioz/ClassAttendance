@@ -5,7 +5,7 @@ import { useLayoutEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { DisputePanel } from '../src/components/teacher/DisputePanel';
-import { TeacherWorkspace } from '../src/components/teacher/TeacherWorkspace';
+import { SessionWorkspace } from '../src/components/teacher/SessionWorkspace';
 import { flagDispute, readAudit } from '../src/domain/audit';
 import { createSession, recordAttendance, saveRoster } from '../src/domain/attendance';
 import { db } from '../src/db/db';
@@ -105,6 +105,36 @@ afterEach(() => {
 });
 
 describe('stable duplicate dispute review', () => {
+  it('displays legitimate epoch-zero presentation times instead of Unknown', () => {
+    render(
+      <DisputePanel
+        keys={keys}
+        session={session}
+        events={[
+          {
+            eventId: 'epoch-dispute',
+            sessionId: session.id,
+            action: 'DISPUTE_FLAGGED',
+            at: 0,
+            performedBy: 'TEACHER_PIN',
+            studentToken: 'alice',
+            disputeId: 'epoch-dispute',
+            firstAt: 0,
+            secondAt: 0,
+            reason: 'Synthetic historical review',
+          },
+        ]}
+        onChanged={onChanged}
+      />,
+    );
+    expect(
+      screen.getByText(`First presentation: ${new Date(0).toLocaleString()}`, { exact: false }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(`Second presentation: ${new Date(0).toLocaleString()}`, { exact: false }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/presentation: Unknown/)).toBeNull();
+  });
   it('binds reason and both timestamps to Alice when a later scan changes to Bob', async () => {
     const { rerender } = render(panel(alice));
     start();
@@ -214,7 +244,7 @@ describe('stable duplicate dispute review', () => {
       studentToken: liveSession.roster[0].token,
     });
     scanOnMount = 'fast initial decoder result';
-    render(<TeacherWorkspace keys={liveKeys} onActive={() => {}} />);
+    render(<SessionWorkspace sessionId={liveSession.id} keys={liveKeys} onActive={() => {}} />);
     await screen.findByRole('button', { name: 'Review duplicate check-in' });
     expect(screen.getByText('Test camera running')).toBeTruthy();
   });
@@ -235,7 +265,7 @@ describe('stable duplicate dispute review', () => {
     });
     const raw = (id: string) => JSON.stringify({ v: 1, id, ch: '492', ts: Math.floor(now / 1000) });
     await recordAttendance(liveKeys, liveSession.id, { raw: raw('001') }, now);
-    render(<TeacherWorkspace keys={liveKeys} onActive={() => {}} />);
+    render(<SessionWorkspace sessionId={liveSession.id} keys={liveKeys} onActive={() => {}} />);
     await screen.findByRole('button', { name: 'Manual check-in / correction (F2)' });
     await act(async () => {
       await scanner.onScan(raw('001'));

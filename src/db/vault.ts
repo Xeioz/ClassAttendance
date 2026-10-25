@@ -1,8 +1,9 @@
+import { teacherOperation } from '../domain/operations';
 import { db } from './db';
 import { decrypt, deriveKeys, encrypt, ITERATIONS, randomSalt } from './crypto';
 import type { VaultKeys, VaultMeta } from '../types';
 
-export async function unlockVault(pin: string): Promise<VaultKeys> {
+async function unlockVaultInternal(pin: string): Promise<VaultKeys> {
   const existing = await db.meta.get('vault');
   const salt = existing?.salt ?? randomSalt();
   if (existing && (existing.v !== 1 || existing.iterations !== ITERATIONS))
@@ -24,3 +25,5 @@ export async function unlockVault(pin: string): Promise<VaultKeys> {
   }
   return keys;
 }
+
+export const unlockVault = teacherOperation(unlockVaultInternal);

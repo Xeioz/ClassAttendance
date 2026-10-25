@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
+import { readRosterSnapshot } from '../src/domain/rosterSnapshot';
 import { webcrypto } from 'node:crypto';
 import { File as NodeFile } from 'node:buffer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -94,7 +95,9 @@ describe('roster change review controls', () => {
     upload('001,Teacher Proposed,A');
     await screen.findByText('Existing: Existing Name');
     fireEvent.click(screen.getByRole('checkbox', { name: /Approve update for row 2/ }));
-    await saveRoster(keys, [{ ...startingRow, name: 'Other Tab Name' }]);
+    await saveRoster(keys, [{ ...startingRow, name: 'Other Tab Name' }], {
+      expectedVersion: (await readRosterSnapshot(keys)).version,
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save 0 additions and 1 updates' }));
     await screen.findByText(/The comparison is refreshed and earlier approvals are cleared/);
     expect(screen.getByText('Existing: Other Tab Name')).toBeTruthy();

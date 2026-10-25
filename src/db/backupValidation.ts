@@ -2,6 +2,10 @@ import { decrypt, ITERATIONS, privateToken } from './crypto';
 import { normalizeId, sectionKey } from '../utils/normalize';
 import { validateTemplateData } from '../domain/templates';
 import type {
+  ClassRow,
+  ClassPrivate,
+  EnrollmentRow,
+  MigrationRow,
   AttendancePrivate,
   AttendanceRow,
   Cipher,
@@ -20,6 +24,9 @@ export const BACKUP_MAX_BYTES = 25 * 1024 * 1024;
 export const BACKUP_TABLE_LIMIT = 100_000;
 export const BACKUP_ROSTER_LIMIT = 10_000;
 export interface BackupData {
+  classes?: ClassRow[];
+  enrollments?: EnrollmentRow[];
+  migrations?: MigrationRow[];
   students: StudentRow[];
   sessions: SessionRow[];
   attendance: AttendanceRow[];
@@ -27,7 +34,7 @@ export interface BackupData {
   /** Absent only in the supported legacy v1 backup format. */
   classTemplates?: TemplateRow[];
 }
-type ValidatedBackupData = BackupData & { classTemplates: TemplateRow[] };
+type ValidatedBackupData = Required<BackupData>;
 const statuses = ['PRESENT', 'LATE', 'ABSENT', 'EXCUSED'] as const;
 const actions = [
   'SCAN_LOGGED',
@@ -157,13 +164,25 @@ function student(value: unknown, path: string): StudentPrivate {
 }
 function attendance(value: unknown, path: string): AttendancePrivate {
   const raw = object(value, path);
-  return {
+  const result: AttendancePrivate = {
     status: choice(raw.status, `${path}.status`, statuses),
     source: choice(raw.source, `${path}.source`, ['QR', 'MANUAL', 'SYSTEM']),
     at: timestamp(raw.at, `${path}.at`),
     reason: optionalText(raw.reason, `${path}.reason`, 500),
     originalAt: optionalTimestamp(raw.originalAt, `${path}.originalAt`),
+    absenceOrigin:
+      raw.absenceOrigin === undefined
+        ? undefined
+        : choice(raw.absenceOrigin, `${path}.absenceOrigin`, ['CLOSURE', 'TEACHER']),
   };
+  if (
+    result.absenceOrigin !== undefined &&
+    (result.status !== 'ABSENT' ||
+      (result.absenceOrigin === 'CLOSURE' && result.source !== 'SYSTEM') ||
+      (result.absenceOrigin === 'TEACHER' && result.source !== 'MANUAL'))
+  )
+    invalid(path, 'contradictory absence provenance');
+  return result;
 }
 async function decoded(
   keys: VaultKeys,
@@ -224,10 +243,19 @@ interface CheckedEvent {
 export async function validateBackupData(
   value: unknown,
   keys: VaultKeys,
-  version: 1 | 2 = 1,
+  version: 1 | 2 | 3 = 1,
 ): Promise<{ data: ValidatedBackupData; courses: number }> {
   const raw = object(value, 'payload');
+  const prototype = raw.classes !== undefined || raw.enrollments !== undefined;
+  const modern = raw.classTemplates !== undefined;
+  if (version === 2 && prototype === modern)
+    invalid('payload', 'ambiguous or missing version 2 schema');
+  if (version === 1 && (prototype || modern || raw.migrations !== undefined))
+    invalid('payload', 'unexpected legacy tables');
   const tables: Record<keyof BackupData, unknown[]> = {
+    classes: [],
+    enrollments: [],
+    migrations: [],
     students: [],
     sessions: [],
     attendance: [],
@@ -236,7 +264,13 @@ export async function validateBackupData(
   };
   for (const name of Object.keys(tables) as (keyof BackupData)[]) {
     const table =
-      name === 'classTemplates' && version === 1 && raw[name] === undefined ? [] : raw[name];
+      raw[name] === undefined &&
+      version !== 3 &&
+      (name === 'migrations' ||
+        (name === 'classTemplates' && !modern) ||
+        (['classes', 'enrollments'].includes(name) && !prototype))
+        ? []
+        : raw[name];
     if (!Array.isArray(table) || table.length > BACKUP_TABLE_LIMIT)
       invalid(
         name,
@@ -247,6 +281,9 @@ export async function validateBackupData(
   if (version === 1 && tables.classTemplates.length)
     invalid('classTemplates', 'templates require backup version 2');
   const data: ValidatedBackupData = {
+    classes: [],
+    enrollments: [],
+    migrations: [],
     students: [],
     sessions: [],
     attendance: [],
@@ -315,8 +352,85 @@ export async function validateBackupData(
       invalid(`${path}.sectionToken`, 'section token does not match its section');
     data.students.push(row);
   }
+  const offerings = new Map<string, ClassPrivate>();
+  const classIdentities = new Set<string>();
+  for (const [index, value] of tables.classes.entries()) {
+    const path = `classes[${index}]`,
+      raw = object(value, path);
+    const row: ClassRow = {
+      id: text(raw.id, `${path}.id`),
+      encrypted: validateCipher(raw.encrypted, `${path}.encrypted`),
+    };
+    if (offerings.has(row.id)) invalid(path, 'duplicate class');
+    const valueRaw = object(await decoded(keys, row.encrypted, `class:${row.id}`, path), path);
+    if (valueRaw.id !== undefined) invalid(path, 'unexpected private class ID');
+    const record: ClassPrivate = {
+      course: text(valueRaw.course, path, 150),
+      section: text(valueRaw.section, path, 150),
+      term: text(valueRaw.term, path, 150),
+      subject: text(valueRaw.subject, path, 150, true),
+      institution: text(valueRaw.institution, path, 150, true),
+      room: text(valueRaw.room, path, 150, true),
+      graceMinutes: valueRaw.graceMinutes as number,
+      timezone: optionalText(valueRaw.timezone, path, 100),
+    };
+    if (
+      sectionKey(record.section) !== record.section ||
+      !Number.isInteger(record.graceMinutes) ||
+      record.graceMinutes < 0 ||
+      record.graceMinutes > 180
+    )
+      invalid(path, 'invalid class defaults');
+    if (record.timezone !== undefined) {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: record.timezone });
+      } catch {
+        invalid(path, 'invalid timezone');
+      }
+    }
+    unique(
+      classIdentities,
+      JSON.stringify([record.course.toLowerCase(), record.section, record.term.toLowerCase()]),
+      path,
+    );
+    offerings.set(row.id, record);
+    data.classes.push(row);
+  }
+  const studentSections = new Map<string, string>();
+  for (const row of data.students)
+    studentSections.set(
+      row.token,
+      ((await decoded(keys, row.encrypted, `student:${row.token}`, 'students')) as StudentPrivate)
+        .section,
+    );
+  const enrollments = new Set<string>();
+  for (const [index, value] of tables.enrollments.entries()) {
+    const path = `enrollments[${index}]`,
+      raw = object(value, path);
+    const row = { classId: text(raw.classId, path), studentToken: text(raw.studentToken, path) };
+    if (
+      !offerings.has(row.classId) ||
+      !studentSections.has(row.studentToken) ||
+      offerings.get(row.classId)!.section !== studentSections.get(row.studentToken)
+    )
+      invalid(path, 'invalid enrollment reference');
+    unique(enrollments, JSON.stringify([row.classId, row.studentToken]), path);
+    data.enrollments.push(row);
+  }
+  const migrationIds = new Set<string>();
+  for (const value of tables.migrations) {
+    const raw = object(value, 'migrations');
+    if (
+      raw.id !== 'schema-v3' ||
+      raw.version !== 3 ||
+      !['fresh', 'legacy-v1', 'prototypev2', 'modernize'].includes(String(raw.source))
+    )
+      invalid('migrations', 'invalid schema metadata');
+    unique(migrationIds, raw.id, 'migrations');
+    data.migrations.push({ id: raw.id, version: 3, source: raw.source as string });
+  }
   const sessions = new Map<string, CheckedSession>(),
-    courses = new Set<string>();
+    courses = new Set<string>([...offerings.values()].map((item) => item.course));
   let activeSessions = 0;
   for (const [index, value] of tables.sessions.entries()) {
     const path = `sessions[${index}]`,
@@ -375,7 +489,16 @@ export async function validateBackupData(
         invalid(`${path}.timezone`, 'unsupported timezone');
       }
     }
+    const classId = optionalText(record.classId, `${path}.classId`, 511);
+    if (
+      classId !== undefined &&
+      (!offerings.has(classId) ||
+        offerings.get(classId)!.course !== record.course ||
+        offerings.get(classId)!.section !== section)
+    )
+      invalid(path, 'invalid session class');
     const session: SessionPrivate = {
+      classId,
       course: text(record.course, `${path}.course`, 100),
       section,
       roomPin,

@@ -19,11 +19,13 @@ export interface RosterReviewState {
 }
 
 export function RosterUpload({
+  classId,
   keys,
   onSaved,
   disabled,
   onReviewStateChange,
 }: {
+  classId?: string;
   keys: VaultKeys;
   onSaved: () => Promise<void>;
   disabled: boolean;
@@ -95,7 +97,7 @@ export function RosterUpload({
     setMessage(t('roster.reading'));
     try {
       const inspection = await inspectRoster(file, selectedEncoding);
-      const comparison = await prepareRosterImport(keys, inspection);
+      const comparison = await prepareRosterImport(keys, inspection, classId);
       setReview(comparison);
       setMessage(
         t('roster.loaded', { count: inspection.rows.length, encoding: inspection.encoding }),
@@ -139,7 +141,7 @@ export function RosterUpload({
         setCategory('all');
         setPage(0);
         try {
-          setReview(await prepareRosterImport(keys, review.inspection));
+          setReview(await prepareRosterImport(keys, review.inspection, classId));
           setMessage(t('roster.refreshed'));
         } catch (refreshError) {
           setReview(undefined);
@@ -164,7 +166,7 @@ export function RosterUpload({
       onDrop={drop}
       aria-busy={busy}
     >
-      <h2 className="text-xl">{t('roster.title')}</h2>
+      <h2 className="text-xl">{classId ? 'Class roster' : t('roster.title')}</h2>
       <p id={descriptionId} className="mb-4 mt-2 text-sm text-slate-600">
         {t('roster.description')}
       </p>

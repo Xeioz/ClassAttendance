@@ -1,5 +1,3 @@
-import { t } from '../i18n';
-
 export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : t('common.error');
+  return error instanceof Error ? error.message : 'The operation failed. Please try again.';
 }

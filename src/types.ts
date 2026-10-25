@@ -17,28 +17,8 @@ export interface StudentRow {
 export interface Student extends StudentPrivate {
   token: string;
 }
-/** Reusable settings deliberately exclude session credentials, times, and rosters. */
-export interface ClassSettings {
-  course: string;
-  section: string;
-  subject?: string;
-  room?: string;
-  institution?: string;
-  graceMinutes: number;
-  timezone: string;
-}
-export interface ClassTemplate {
-  id: string;
-  name: string;
-  settings: ClassSettings;
-  createdAt: number;
-  updatedAt: number;
-}
-export interface TemplateRow {
-  id: string;
-  encrypted: Cipher;
-}
 export interface SessionPrivate {
+  classId?: string;
   course: string;
   section: string;
   roomPin: string;
@@ -50,6 +30,27 @@ export interface SessionPrivate {
   room?: string;
   timezone?: string;
   closedAt?: number;
+}
+export interface ClassPrivate {
+  timezone?: string;
+  course: string;
+  section: string;
+  term: string;
+  subject: string;
+  institution: string;
+  room: string;
+  graceMinutes: number;
+}
+export interface ClassRow {
+  id: string;
+  encrypted: Cipher;
+}
+export interface ClassOffering extends ClassPrivate {
+  id: string;
+}
+export interface EnrollmentRow {
+  classId: string;
+  studentToken: string;
 }
 export interface SessionRow {
   id: string;
@@ -67,6 +68,7 @@ export interface AttendancePrivate {
   source: 'QR' | 'MANUAL' | 'SYSTEM';
   reason?: string;
   originalAt?: number;
+  absenceOrigin?: 'CLOSURE' | 'TEACHER';
 }
 export interface AttendanceRow {
   sessionId: string;
@@ -121,4 +123,32 @@ export interface AuditPayload {
 export interface AuditEntry extends AuditPayload {
   eventId: string;
   sessionId: string;
+}
+
+/** Reusable settings deliberately exclude session credentials, times, and rosters. */
+export interface ClassSettings {
+  course: string;
+  section: string;
+  subject?: string;
+  room?: string;
+  institution?: string;
+  graceMinutes: number;
+  timezone: string;
+}
+export interface ClassTemplate {
+  id: string;
+  name: string;
+  settings: ClassSettings;
+  createdAt: number;
+  updatedAt: number;
+}
+export interface TemplateRow {
+  id: string;
+  encrypted: Cipher;
+}
+
+export interface MigrationRow {
+  id: string;
+  source: string;
+  version: 3;
 }

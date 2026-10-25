@@ -116,7 +116,7 @@ export async function buildExcelReport(
       'Official name',
       'Section',
       'Status',
-      'First recorded (UTC)',
+      'Recorded / corrected (UTC)',
       'Last changed (UTC)',
       'Source',
       'Reason',
@@ -214,7 +214,7 @@ export async function buildExcelReport(
       '(PRESENT + LATE) / all enrolled; excused students remain in the denominator.',
     ],
     [
-      'First recorded (UTC)',
+      'Recorded / corrected (UTC)',
       'Blank for unrecorded and ABSENT entries under the existing contract. Original timestamps remain in audit history when recorded.',
     ],
     [

@@ -132,7 +132,7 @@ describe('Phase 3 export snapshot', () => {
     const parsed = Papa.parse<Record<string, string>>(csv, { header: true }).data;
     expect(parsed.find((row) => row['Student ID'] === '00-1')?.Status).toBe('NOT_YET_RECORDED');
     expect(parsed[0].Institution).toBe('Test College');
-    expect(reportFilename(session, 'csv')).toBe('IT301_A_Attendance_2026-10-18.csv');
+    expect(reportFilename(session, 'csv')).toBe(`IT301_A_Attendance_2026-10-18_${session.id}.csv`);
     for (const value of ['=1+1', '+SUM(A1)', '-5+1', '@SUM(A1)', '  =1+1', '\t=1'])
       expect(spreadsheetSafe(value)).toBe(`'${value}`);
     const student = session.roster[0];

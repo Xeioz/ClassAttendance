@@ -1,12 +1,11 @@
+import { teacherOperation } from './operations';
 import Dexie from 'dexie';
-import { t } from '../i18n';
 import { db } from '../db/db';
 import { decrypt, encrypt } from '../db/crypto';
 import { assertActiveVault, makeAudit, validateReason } from './audit';
 import { parseQR, punctuality } from './qr';
 import type { AttendancePrivate, ScanResult, SessionPrivate, Student, VaultKeys } from '../types';
-
-export async function recordAttendance(
+async function recordAttendanceInternal(
   keys: VaultKeys,
   sessionId: string,
   input:
@@ -15,7 +14,8 @@ export async function recordAttendance(
   now = Date.now(),
 ): Promise<ScanResult> {
   const stored = await db.sessions.get(sessionId);
-  if (!stored || stored.state !== 'ACTIVE') throw new Error(t('scan.closed'));
+  if (!stored || stored.state !== 'ACTIVE')
+    throw new Error('This session is closed or unavailable.');
   const session = await decrypt<SessionPrivate>(
     keys.encryption,
     stored.encrypted,
@@ -25,9 +25,10 @@ export async function recordAttendance(
   const student = session.roster.find((row) => row.id === id);
   if ('student' in input) {
     validateReason(input.reason);
-    if (!student || input.student.token !== student.token) throw new Error(t('scan.chooseStudent'));
+    if (!student || input.student.token !== student.token)
+      throw new Error('Choose an enrolled student.');
     if (input.status !== undefined && !['PRESENT', 'LATE', 'EXCUSED'].includes(input.status))
-      throw new Error(t('scan.invalidManualStatus'));
+      throw new Error('Invalid manual check-in status.');
   }
   const entry: AttendancePrivate = {
     status:
@@ -51,7 +52,7 @@ export async function recordAttendance(
         JSON.stringify((await db.sessions.get(sessionId))?.encrypted) !==
         JSON.stringify(stored.encrypted)
       )
-        throw new Error(t('scan.sessionChanged'));
+        throw new Error('The session changed. Refresh and retry.');
       const existing = student ? await db.attendance.get([sessionId, student.token]) : undefined;
       const prior = existing
         ? await Dexie.waitFor(
@@ -94,35 +95,26 @@ export async function recordAttendance(
   if (result.kind === 'unknown')
     return {
       kind: 'unknown',
-      title: t('scan.unlisted'),
-      detail: t('scan.unlistedDetail', { id }),
+      title: 'Not in this roster',
+      detail: `${id} · Enrollment has not been changed.`,
     };
   if (result.kind === 'duplicate')
     return {
       kind: 'duplicate',
-      title: t('scan.duplicate'),
-      detail: t('scan.duplicateDetail', {
-        name: student!.name,
-        status: t(`status.${result.prior!.status}`),
-        time: new Date(result.prior!.originalAt ?? result.prior!.at).toLocaleTimeString(),
-      }),
+      title: 'Already recorded',
+      detail: `${student!.name} · ${result.prior!.status} · ${new Date(result.prior!.originalAt ?? result.prior!.at).toLocaleTimeString()}`,
       studentToken: student!.token,
       firstAt: result.prior!.originalAt ?? result.prior!.at,
       secondAt: now,
     };
   return {
     kind: 'valid',
-    title: t(`scan.saved.${entry.status}`),
-    detail: t('scan.savedDetail', {
-      name: student!.name,
-      id: student!.id,
-      time: new Date(now).toLocaleTimeString(),
-    }),
+    title: `${entry.status === 'EXCUSED' ? 'Excused' : entry.status === 'LATE' ? 'Late' : 'Present'} · Saved`,
+    detail: `${student!.name} · ${student!.id} · ${new Date(now).toLocaleTimeString()}`,
     studentToken: student!.token,
   };
 }
-
-export async function correctAttendance(
+async function correctAttendanceInternal(
   keys: VaultKeys,
   sessionId: string,
   student: Student,
@@ -131,15 +123,16 @@ export async function correctAttendance(
 ): Promise<void> {
   validateReason(reason);
   if (!['PRESENT', 'LATE', 'ABSENT', 'EXCUSED'].includes(status))
-    throw new Error(t('scan.invalidStatus'));
+    throw new Error('Invalid attendance status.');
   const session = await db.sessions.get(sessionId);
-  if (!session || session.state !== 'ACTIVE') throw new Error(t('scan.reopen'));
+  if (!session || session.state !== 'ACTIVE')
+    throw new Error('Reopen the session before changing its records.');
   if (
     !(
       await decrypt<SessionPrivate>(keys.encryption, session.encrypted, `session:${sessionId}`)
     ).roster.some((row) => row.token === student.token)
   )
-    throw new Error(t('scan.wrongSession'));
+    throw new Error('Student does not belong to this session.');
   const priorRow = await db.attendance.get([sessionId, student.token]);
   const prior = priorRow
     ? await decrypt<AttendancePrivate>(
@@ -156,6 +149,7 @@ export async function correctAttendance(
       at,
       originalAt: prior?.originalAt ?? (prior && prior.source !== 'SYSTEM' ? prior.at : undefined),
       source: 'MANUAL',
+      ...(status === 'ABSENT' ? { absenceOrigin: 'TEACHER' } : {}),
       reason: reason.trim(),
     },
     `attendance:${sessionId}:${student.token}`,
@@ -177,8 +171,10 @@ export async function correctAttendance(
       JSON.stringify(await db.attendance.get([sessionId, student.token])) !==
       JSON.stringify(priorRow)
     )
-      throw new Error(t('scan.attendanceChanged'));
+      throw new Error('Attendance changed. Refresh and retry.');
     await db.attendance.put({ sessionId, studentToken: student.token, encrypted: record });
     await db.scanEvents.add(event);
   });
 }
+export const recordAttendance = teacherOperation(recordAttendanceInternal);
+export const correctAttendance = teacherOperation(correctAttendanceInternal);
