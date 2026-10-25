@@ -47,7 +47,10 @@ describe('roster change review controls', () => {
       name: 'Save 1 additions and 1 updates',
     }) as HTMLButtonElement;
     expect(save.disabled).toBe(true);
-    expect(state).toHaveBeenLastCalledWith({ pending: true, blockingIssues: 1, changes: 2 });
+    // A committed DOM update can precede its passive review-state notification.
+    await waitFor(() =>
+      expect(state).toHaveBeenLastCalledWith({ pending: true, blockingIssues: 1, changes: 2 }),
+    );
     fireEvent.click(screen.getByRole('checkbox', { name: /Approve update for row 2, ID 001/ }));
     expect(save.disabled).toBe(false);
     fireEvent.change(screen.getByLabelText('Filter change category'), {
@@ -61,7 +64,9 @@ describe('roster change review controls', () => {
     expect((await listStudents(keys)).find((student) => student.id === '001')?.name).toBe(
       'Proposed Name',
     );
-    expect(state).toHaveBeenLastCalledWith({ pending: false, blockingIssues: 0, changes: 0 });
+    await waitFor(() =>
+      expect(state).toHaveBeenLastCalledWith({ pending: false, blockingIssues: 0, changes: 0 }),
+    );
   });
 
   it('keeps every invalid/conflicting row visible, blocks the entire file, and cancels without writes', async () => {

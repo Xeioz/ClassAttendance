@@ -1,12 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { OfflineStatus } from './components/common/OfflineStatus';
 import { StudentPass } from './components/student/StudentPass';
-import { TeacherPortal } from './components/teacher/TeacherPortal';
+import { TeacherEntry } from './components/teacher/TeacherEntry';
 import { t } from './i18n';
 
 export function App() {
-  const [role, setRole] = useState<'student' | 'teacher'>('student');
+  const [role, setRole] = useState<'student' | 'teacher'>(() =>
+    window.location.hash === '#teacher' ? 'teacher' : 'student',
+  );
   const [active, setActive] = useState(false);
+  useEffect(() => {
+    const navigate = () => {
+      const next = window.location.hash === '#teacher' ? 'teacher' : 'student';
+      if (next === role) return;
+      setRole(next);
+      setActive(false);
+    };
+    window.addEventListener('hashchange', navigate);
+    return () => window.removeEventListener('hashchange', navigate);
+  }, [role]);
   if (!window.isSecureContext)
     return (
       <main className="card mx-auto my-12 max-w-xl">
@@ -39,6 +51,8 @@ export function App() {
                 aria-pressed={role === item}
                 className={role === item ? 'btn' : 'secondary'}
                 onClick={() => {
+                  if (role === item) return;
+                  window.location.hash = item;
                   setRole(item);
                   setActive(false);
                 }}
@@ -60,7 +74,7 @@ export function App() {
           </p>
         </div>
         <OfflineStatus active={active} />
-        {role === 'student' ? <StudentPass /> : <TeacherPortal onActive={setActive} />}
+        {role === 'student' ? <StudentPass /> : <TeacherEntry onActive={setActive} />}
       </main>
       <footer className="mx-auto max-w-6xl px-5 pb-8 text-xs text-slate-600">
         <a

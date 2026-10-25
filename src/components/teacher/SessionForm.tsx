@@ -92,7 +92,11 @@ export function SessionForm({
 
   function focusField(field: string) {
     const control = formRef.current?.elements.namedItem(field);
-    if (control instanceof HTMLElement) control.focus();
+    if (control instanceof HTMLElement) {
+      const details = control.closest('details');
+      if (details) details.open = true;
+      control.focus();
+    }
   }
   function showError(cause: unknown) {
     const problem =
@@ -391,15 +395,15 @@ export function SessionForm({
       <fieldset disabled={controlsDisabled} className="grid gap-4">
         <legend className="mb-3 font-semibold">{t('templates.settingsHeading')}</legend>
         <div className="grid gap-4 sm:grid-cols-2">
-          {(['institution', 'subject', 'room', 'course'] as const).map((field) => (
+          {(['course'] as const).map((field) => (
             <label key={field} htmlFor={`${id}-${field}`}>
               {t(`templates.${field}`)}
               <input
                 {...fieldProps(field)}
                 value={settings[field] ?? ''}
                 onChange={(event) => edit(field, event.target.value)}
-                maxLength={field === 'course' ? 100 : 150}
-                required={field === 'course'}
+                maxLength={100}
+                required
               />
             </label>
           ))}
@@ -440,29 +444,50 @@ export function SessionForm({
               required
             />
           </label>
-          <label htmlFor={`${id}-timezone`}>
-            {t('templates.timezone')}
-            <input
-              {...fieldProps('timezone')}
-              value={settings.timezone}
-              onChange={(event) => edit('timezone', event.target.value)}
-              placeholder="Asia/Manila"
-              aria-describedby={[
-                `${id}-timezone-help`,
-                error?.field === 'timezone' ? `${id}-error` : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            />
-          </label>
         </div>
         <p id={`${id}-section-help`} className="text-sm text-slate-600">
           {t('templates.sectionHelp')}
           {sectionMissing ? ` ${t('templates.unavailableSection', { section })}.` : ''}
         </p>
-        <p id={`${id}-timezone-help`} className="text-sm text-slate-600">
-          {t('templates.timezoneHelp', { timezone: deviceTimezone })}
-        </p>
+        <details className="rounded-xl border border-slate-200 p-4">
+          <summary className="min-h-12 cursor-pointer py-3 font-semibold">
+            {t('templates.reportDetails')}
+          </summary>
+          <p className="mb-3 text-sm text-slate-600">
+            {t('templates.reportDefaults', { timezone: settings.timezone || deviceTimezone })}
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(['institution', 'subject', 'room'] as const).map((field) => (
+              <label key={field} htmlFor={`${id}-${field}`}>
+                {t(`templates.${field}`)}
+                <input
+                  {...fieldProps(field)}
+                  value={settings[field] ?? ''}
+                  onChange={(event) => edit(field, event.target.value)}
+                  maxLength={150}
+                />
+              </label>
+            ))}
+            <label htmlFor={`${id}-timezone`}>
+              {t('templates.timezone')}
+              <input
+                {...fieldProps('timezone')}
+                value={settings.timezone}
+                onChange={(event) => edit('timezone', event.target.value)}
+                placeholder="Asia/Manila"
+                aria-describedby={[
+                  `${id}-timezone-help`,
+                  error?.field === 'timezone' ? `${id}-error` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              />
+            </label>
+          </div>
+          <p id={`${id}-timezone-help`} className="mt-3 text-sm text-slate-600">
+            {t('templates.timezoneHelp', { timezone: deviceTimezone })}
+          </p>
+        </details>
       </fieldset>
       <fieldset disabled={controlsDisabled || !!activeSession} className="grid gap-4">
         <legend className="mb-3 font-semibold">{t('templates.sessionHeading')}</legend>
@@ -484,6 +509,29 @@ export function SessionForm({
               autoComplete="off"
             />
           </label>
+          <button
+            type="button"
+            className="secondary self-end"
+            onClick={() => {
+              try {
+                const bytes = new Uint8Array(6);
+                // Rejection sampling avoids modulo bias; room challenges are public, not credentials.
+                let challenge = '';
+                while (challenge.length < 6) {
+                  crypto.getRandomValues(bytes);
+                  for (const byte of bytes)
+                    if (byte < 250 && challenge.length < 6) challenge += String(byte % 10);
+                }
+                setPin(challenge);
+                setError(undefined);
+                setMessage(t('templates.challengeGenerated'));
+              } catch (cause) {
+                showError(cause);
+              }
+            }}
+          >
+            {t('templates.generateChallenge')}
+          </button>
           <label htmlFor={`${id}-startsAt`}>
             {t('templates.start')}
             <input
@@ -497,6 +545,17 @@ export function SessionForm({
               required
             />
           </label>
+          <button
+            type="button"
+            className="secondary self-end"
+            onClick={() => {
+              setStart(localMinute());
+              setError(undefined);
+              setMessage(t('templates.timeUpdated'));
+            }}
+          >
+            {t('templates.useCurrentTime')}
+          </button>
         </div>
         <p className="text-sm text-slate-600">{t('templates.freshSession')}</p>
       </fieldset>

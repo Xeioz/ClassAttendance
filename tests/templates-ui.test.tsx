@@ -81,6 +81,47 @@ function expectFieldError(label: string) {
 }
 
 describe('class templates and reviewed session creation', () => {
+  it('generates a reviewable challenge and refreshes time without implicitly creating a session', async () => {
+    render(
+      <SessionForm keys={keys} sections={['A']} students={students} onCreated={async () => {}} />,
+    );
+    await loaded();
+    change('Course', 'SYN101');
+    fireEvent.click(screen.getByRole('button', { name: 'Generate room challenge' }));
+    expect(value('Room challenge')).toMatch(/^\d{6}$/);
+    change("Start time (this device's timezone)", '2020-01-01T00:00');
+    fireEvent.click(screen.getByRole('button', { name: 'Use current time' }));
+    const entered = new Date(value("Start time (this device's timezone)")).getTime();
+    expect(Math.abs(Date.now() - entered)).toBeLessThan(60_000);
+    expect(await listSessions(keys)).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Create attendance session' }));
+    await waitFor(async () => expect(await listSessions(keys)).toHaveLength(1));
+  });
+
+  it('retains collapsed report details and expands them for focused validation errors', async () => {
+    render(
+      <SessionForm keys={keys} sections={['A']} students={students} onCreated={async () => {}} />,
+    );
+    await loaded();
+    const timezone = screen.getByLabelText('Class and report timezone', { exact: true });
+    const details = timezone.closest('details')!;
+    expect(details.open).toBe(false);
+    change('Course', 'SYN101');
+    change('Template name', 'Report settings');
+    change('Room (optional)', 'Retained lab');
+    change('Class and report timezone', 'Invalid/Timezone');
+    fireEvent.click(screen.getByRole('button', { name: 'Save new template' }));
+    expectFieldError('Class and report timezone');
+    expect(details.open).toBe(true);
+    change('Class and report timezone', 'Asia/Manila');
+    details.open = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Save new template' }));
+    await waitFor(async () =>
+      expect((await listTemplates(keys))[0]?.settings.room).toBe('Retained lab'),
+    );
+    expect((await listTemplates(keys))[0].settings.timezone).toBe('Asia/Manila');
+  });
+
   it('lets a fresh vault save a future-section template before a roster import and canonicalizes section suggestions', async () => {
     await db.students.clear();
     const onCreated = vi.fn(async () => {});

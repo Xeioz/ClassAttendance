@@ -105,6 +105,36 @@ afterEach(() => {
 });
 
 describe('stable duplicate dispute review', () => {
+  it('displays legitimate epoch-zero presentation times instead of Unknown', () => {
+    render(
+      <DisputePanel
+        keys={keys}
+        session={session}
+        events={[
+          {
+            eventId: 'epoch-dispute',
+            sessionId: session.id,
+            action: 'DISPUTE_FLAGGED',
+            at: 0,
+            performedBy: 'TEACHER_PIN',
+            studentToken: 'alice',
+            disputeId: 'epoch-dispute',
+            firstAt: 0,
+            secondAt: 0,
+            reason: 'Synthetic historical review',
+          },
+        ]}
+        onChanged={onChanged}
+      />,
+    );
+    expect(
+      screen.getByText(`First presentation: ${new Date(0).toLocaleString()}`, { exact: false }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(`Second presentation: ${new Date(0).toLocaleString()}`, { exact: false }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/presentation: Unknown/)).toBeNull();
+  });
   it('binds reason and both timestamps to Alice when a later scan changes to Bob', async () => {
     const { rerender } = render(panel(alice));
     start();

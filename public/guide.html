@@ -2,6 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'none'; frame-src 'none'" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Attendance Desk guide</title>
     <style>
@@ -92,6 +94,12 @@
           not start attendance or copy a previous roster. Start input uses this device's timezone;
           the class/report timezone is separate. Check the current roster count and choose a fresh
           challenge before selecting <strong>Create attendance session</strong>.
+        </p>
+        <p>
+          Expand <strong>Report details and timezone (optional)</strong> to review institution,
+          subject, room, and report timezone. Saved values remain in use when this group is closed.
+          <strong>Generate room challenge</strong> fills a fresh six-digit challenge;
+          <strong>Use current time</strong> updates the start draft. Neither action starts attendance.
         </p>
       </section>
       <section>

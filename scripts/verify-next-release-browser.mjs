@@ -16,6 +16,8 @@ const server = spawn(
   [
     'node_modules/vite/bin/vite.js',
     'preview',
+    '--configLoader',
+    'runner',
     '--host',
     '127.0.0.1',
     '--port',
@@ -61,7 +63,15 @@ async function unlock(page) {
   await form(page).waitFor({ state: 'attached' });
 }
 async function axe(page, screen) {
-  await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
+  // Serve instrumentation from this origin so the real CSP stays enforced.
+  const axeUrl = new URL('__qa__/axe.js', url).href;
+  await page.route(axeUrl, async (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      body: await fs.readFile(require.resolve('axe-core/axe.min.js'), 'utf8'),
+    }),
+  );
+  await page.addScriptTag({ url: axeUrl });
   const report = await page.evaluate(async () => {
     const r = await window.axe.run(document, {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
@@ -99,6 +109,46 @@ try {
   const page = await context.newPage();
   page.on('pageerror', (error) => results.pageErrors.push(error.message));
   await page.goto(url);
+  assert.equal(await page.getByLabel('Student ID', { exact: true }).count(), 1);
+  assert.equal(
+    await page.evaluate(() =>
+      performance.getEntriesByType('resource').some((entry) => /\/TeacherPortal-/.test(entry.name)),
+    ),
+    false,
+  );
+  const policy = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        document.addEventListener(
+          'securitypolicyviolation',
+          (event) => resolve({ directive: event.effectiveDirective, blocked: event.blockedURI }),
+          { once: true },
+        );
+        const script = document.createElement('script');
+        script.textContent = 'window.__injectedScriptRan = true';
+        document.head.append(script);
+      }),
+  );
+  assert.equal(policy.directive, 'script-src-elem');
+  assert.equal(await page.evaluate(() => window.__injectedScriptRan === true), false);
+  assert.equal(await page.locator('meta[name="referrer"]').getAttribute('content'), 'no-referrer');
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.getByLabel('Student ID', { exact: true }).fill('00-2');
+  await page.getByLabel('Room challenge', { exact: true }).fill('492');
+  await page.getByRole('button', { name: 'Display QR pass', exact: true }).click();
+  await page.getByRole('img', { name: 'Attendance pass for student 002', exact: true }).waitFor();
+  const syntheticQr = await page
+    .locator('canvas')
+    .evaluate((canvas) => canvas.toDataURL('image/png'));
+  assert.equal(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+    true,
+  );
+  await page.screenshot({ path: `${output}/student-mobile.png`, fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  results.checks.push(
+    'Student entry defers teacher module loading; mobile QR generated; production CSP blocks inline script; no-referrer present',
+  );
   await page.getByRole('button', { name: 'Teacher workspace', exact: true }).click();
   await axe(page, 'Create workspace');
   await page.getByLabel('Master PIN (6–12 digits)', { exact: true }).fill(pin);
@@ -126,6 +176,7 @@ try {
     true,
   );
   await form(page).getByLabel('Course', { exact: true }).fill('SYN101');
+  await form(page).getByText('Report details and timezone (optional)', { exact: true }).click();
   await form(page).getByLabel('Room (optional)', { exact: true }).fill('Synthetic room');
   await form(page).getByRole('button', { name: 'Save new template', exact: true }).click();
   await page.getByText('Saved template “Morning synthetic class”.', { exact: true }).waitFor();
@@ -144,6 +195,25 @@ try {
     .selectOption({ label: 'Morning synthetic class' });
   assert.equal(await form(page).getByLabel('Course', { exact: true }).inputValue(), 'SYN101');
   assert.equal(await form(page).getByLabel('Room challenge', { exact: true }).inputValue(), '');
+  await form(page).getByRole('button', { name: 'Generate room challenge', exact: true }).click();
+  assert.match(
+    await form(page).getByLabel('Room challenge', { exact: true }).inputValue(),
+    /^\d{6}$/,
+  );
+  await form(page)
+    .getByLabel("Start time (this device's timezone)", { exact: true })
+    .fill('2020-01-01T00:00');
+  await form(page).getByRole('button', { name: 'Use current time', exact: true }).click();
+  assert.notEqual(
+    await form(page)
+      .getByLabel("Start time (this device's timezone)", { exact: true })
+      .inputValue(),
+    '2020-01-01T00:00',
+  );
+  assert.equal(
+    await page.getByRole('heading', { name: 'Record attendance', exact: true }).count(),
+    0,
+  );
   await page.getByRole('button', { name: 'Test camera', exact: true }).click();
   await page.getByText(/Camera test failed:/).waitFor();
   await axe(page, 'Templates and readiness');
@@ -227,6 +297,49 @@ try {
   await page
     .getByRole('button', { name: 'Manual check-in / correction (F2)', exact: true })
     .waitFor();
+  await page.evaluate(async (imageData) => {
+    const original = navigator.mediaDevices.getUserMedia;
+    const image = new Image();
+    image.src = imageData;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const context = canvas.getContext('2d');
+    const draw = () => {
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, 640, 480);
+      context.drawImage(image, 160, 80, 320, 320);
+    };
+    draw();
+    const stream = canvas.captureStream(10);
+    const timer = setInterval(draw, 100);
+    navigator.mediaDevices.getUserMedia = async () => stream;
+    window.__qaMedia = {
+      stream,
+      restore() {
+        clearInterval(timer);
+        navigator.mediaDevices.getUserMedia = original;
+        stream.getTracks().forEach((track) => track.stop());
+      },
+    };
+  }, syntheticQr);
+  await page.getByLabel('Use compatibility decoder', { exact: true }).check();
+  await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'Demo Bob' })
+    .filter({ hasText: 'PRESENT' })
+    .first()
+    .waitFor();
+  await page.getByRole('button', { name: 'Stop camera', exact: true }).click();
+  await page.waitForFunction(() =>
+    window.__qaMedia.stream.getTracks().every((track) => track.readyState === 'ended'),
+  );
+  await page.evaluate(() => window.__qaMedia.restore());
+  results.checks.push(
+    'Bundled compatibility decoder scanned a generated QR from a synthetic canvas camera, committed attendance and released the stream; no physical camera claim',
+  );
   await page.keyboard.press('F2');
   const dialog = page.getByRole('dialog');
   await dialog.waitFor();
@@ -243,7 +356,8 @@ try {
     .first()
     .waitFor();
   const preparation = page.locator('details').filter({ has: form(page) });
-  if (!(await preparation.getAttribute('open'))) await preparation.locator('summary').click();
+  if (!(await preparation.getAttribute('open')))
+    await preparation.locator(':scope > summary').click();
   await form(page)
     .getByLabel('Saved class template')
     .selectOption({ label: 'Independent afternoon class' });
@@ -261,6 +375,14 @@ try {
   const backup = await backupEvent;
   const backupPath = `${output}/synthetic-backup.json`;
   await backup.saveAs(backupPath);
+  for (const name of ['Download Excel report', 'Download CSV']) {
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name, exact: true }).click();
+    const file = await download;
+    await file.saveAs(`${output}/${file.suggestedFilename()}`);
+    assert.equal(await file.failure(), null);
+  }
+  results.checks.push('Excel and CSV downloaded successfully with the production CSP enforced');
   await page
     .getByText('Saving the file outside this device has not been verified.', { exact: false })
     .waitFor();
@@ -274,6 +396,13 @@ try {
     'narrow layout overflow',
   );
   await page.screenshot({ path: `${output}/teacher-narrow-after.png`, fullPage: true });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  assert.equal(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+    true,
+    'tablet layout overflow',
+  );
+  await page.screenshot({ path: `${output}/teacher-tablet.png`, fullPage: true });
   await page.setViewportSize({ width: 1280, height: 1000 });
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
@@ -304,7 +433,7 @@ try {
   await recovery
     .locator('details')
     .filter({ has: form(recovery) })
-    .locator('summary')
+    .locator(':scope > summary')
     .click();
   await form(recovery)
     .getByLabel('Saved class template')
@@ -312,6 +441,32 @@ try {
   assert.equal(await form(recovery).getByLabel('Course', { exact: true }).inputValue(), 'SYN101');
   results.checks.push(
     'Downloaded v2 backup restored templates, current roster, active session and attendance into a fresh Chromium context; not a second physical device',
+  );
+  await recovery.getByRole('button', { name: 'Student pass', exact: true }).click();
+  await recovery.getByRole('button', { name: 'Teacher workspace', exact: true }).click();
+  await recovery.getByRole('button', { name: 'Unlock teacher workspace', exact: true }).waitFor();
+  assert.equal(
+    await recovery.getByRole('heading', { name: 'Record attendance', exact: true }).count(),
+    0,
+  );
+  results.checks.push(
+    'Switching to student view discards the unlocked teacher subtree and requires PIN on return',
+  );
+
+  // Isolate a real failed dynamic import without disabling the production CSP.
+  const retryContext = await browser.newContext({ serviceWorkers: 'block' });
+  const retryPage = await retryContext.newPage();
+  await retryPage.route('**/TeacherPortal-*.js', (route) => route.abort());
+  await retryPage.goto(url);
+  await retryPage.getByRole('button', { name: 'Teacher workspace', exact: true }).click();
+  await retryPage.getByRole('button', { name: 'Retry teacher workspace', exact: true }).waitFor();
+  await retryPage.unroute('**/TeacherPortal-*.js');
+  await retryPage.getByRole('button', { name: 'Retry teacher workspace', exact: true }).click();
+  await retryPage.getByLabel('Confirm new PIN', { exact: true }).waitFor();
+  assert.equal(new URL(retryPage.url()).hash, '#teacher');
+  await retryContext.close();
+  results.checks.push(
+    'Failed teacher module request exposes retry; retry reloads directly into #teacher and recovers without deleting data',
   );
   assert.deepEqual(results.pageErrors, []);
   results.passed = true;

@@ -1,0 +1,133 @@
+{
+  "date": "2026-10-24",
+  "packageVersion": "0.3.0",
+  "baselineCommit": "e93c6ff",
+  "syntheticDataOnly": true,
+  "tests": {
+    "passed": 190,
+    "failed": 0,
+    "files": 24,
+    "success": true
+  },
+  "exportRows": [
+    0,
+    1,
+    45,
+    10000
+  ],
+  "exportReaders": [
+    "SheetJS",
+    "ExcelJS"
+  ],
+  "typeScript": "passed",
+  "productionBuilds": [
+    "/",
+    "/ClassAttendance/"
+  ],
+  "browser": {
+    "root": {
+      "url": "http://127.0.0.1:4178/",
+      "passed": true,
+      "checks": [
+        "Student entry defers teacher module loading; mobile QR generated; production CSP blocks inline script; no-referrer present",
+        "Keyboard workspace creation, field-linked validation, template creation/duplication/independent edit, explicit start and fresh challenge; camera failure retains manual alternative",
+        "Encrypted templates, bundled English and the updated teacher guide work during an offline production tab reload; this is not a cold device restart",
+        "Invalid/conflicting import blocked; cancel unchanged; before/after update approval; two-tab stale comparison requires second explicit save; omitted students retained",
+        "Bundled compatibility decoder scanned a generated QR from a synthetic canvas camera, committed attendance and released the stream; no physical camera claim",
+        "Excel and CSV downloaded successfully with the production CSP enforced",
+        "New session uses all five current students; manual attendance saves after camera failure; template deletion leaves active session and attendance unchanged; backup request does not claim safe storage/recovery",
+        "375px layout and 200% text enlargement retain page width; screenshots preserved; real assistive technology not tested",
+        "Downloaded v2 backup restored templates, current roster, active session and attendance into a fresh Chromium context; not a second physical device",
+        "Switching to student view discards the unlocked teacher subtree and requires PIN on return",
+        "Failed teacher module request exposes retry; retry reloads directly into #teacher and recovers without deleting data"
+      ],
+      "accessibility": [
+        {
+          "screen": "Create workspace",
+          "violations": [],
+          "incomplete": [],
+          "passedRules": 19
+        },
+        {
+          "screen": "Templates and readiness",
+          "violations": [],
+          "incomplete": [],
+          "passedRules": 27
+        },
+        {
+          "screen": "Roster change review",
+          "violations": [],
+          "incomplete": [],
+          "passedRules": 29
+        },
+        {
+          "screen": "Manual attendance dialog",
+          "violations": [],
+          "incomplete": [
+            "color-contrast"
+          ],
+          "passedRules": 15
+        }
+      ],
+      "pageErrors": []
+    },
+    "subpath": {
+      "url": "http://127.0.0.1:4179/ClassAttendance/",
+      "passed": true,
+      "checks": [
+        "Student entry defers teacher module loading; mobile QR generated; production CSP blocks inline script; no-referrer present",
+        "Keyboard workspace creation, field-linked validation, template creation/duplication/independent edit, explicit start and fresh challenge; camera failure retains manual alternative",
+        "Encrypted templates, bundled English and the updated teacher guide work during an offline production tab reload; this is not a cold device restart",
+        "Invalid/conflicting import blocked; cancel unchanged; before/after update approval; two-tab stale comparison requires second explicit save; omitted students retained",
+        "Bundled compatibility decoder scanned a generated QR from a synthetic canvas camera, committed attendance and released the stream; no physical camera claim",
+        "Excel and CSV downloaded successfully with the production CSP enforced",
+        "New session uses all five current students; manual attendance saves after camera failure; template deletion leaves active session and attendance unchanged; backup request does not claim safe storage/recovery",
+        "375px layout and 200% text enlargement retain page width; screenshots preserved; real assistive technology not tested",
+        "Downloaded v2 backup restored templates, current roster, active session and attendance into a fresh Chromium context; not a second physical device",
+        "Switching to student view discards the unlocked teacher subtree and requires PIN on return",
+        "Failed teacher module request exposes retry; retry reloads directly into #teacher and recovers without deleting data"
+      ],
+      "accessibility": [
+        {
+          "screen": "Create workspace",
+          "violations": [],
+          "incomplete": [],
+          "passedRules": 19
+        },
+        {
+          "screen": "Templates and readiness",
+          "violations": [],
+          "incomplete": [],
+          "passedRules": 27
+        },
+        {
+          "screen": "Roster change review",
+          "violations": [],
+          "incomplete": [],
+          "passedRules": 29
+        },
+        {
+          "screen": "Manual attendance dialog",
+          "violations": [],
+          "incomplete": [
+            "color-contrast"
+          ],
+          "passedRules": 15
+        }
+      ],
+      "pageErrors": []
+    }
+  },
+  "blocked": [
+    "Vite dependency upgrade/full advisory audit: registry EACCES and no local pnpm",
+    "Independent Python export verifier: openpyxl missing and installation unsuccessful"
+  ],
+  "notPerformed": [
+    "Physical optical camera/torch tests",
+    "Physical screen readers",
+    "Power loss/storage eviction",
+    "Second physical device recovery",
+    "Live HTTPS deployment",
+    "Institutional policy approval"
+  ]
+}

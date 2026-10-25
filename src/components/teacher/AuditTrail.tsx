@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { AuditEntry, Session } from '../../types';
 import { normalizeId } from '../../utils/normalize';
 import { t } from '../../i18n';
+import { usePagination } from '../../hooks/pagination';
+import { Pagination } from '../common/Pagination';
 
 export function AuditTrail({ events, session }: { events: AuditEntry[]; session: Session }) {
   const [query, setQuery] = useState('');
@@ -27,6 +29,7 @@ export function AuditTrail({ events, session }: { events: AuditEntry[]; session:
       Boolean(searchId && [event.studentId, student?.id].some((id) => id?.includes(searchId)))
     );
   });
+  const pagination = usePagination(filtered, 100, JSON.stringify([session.id, query, action]));
   return (
     <details className="card">
       <summary className="min-h-12 cursor-pointer text-xl font-semibold">
@@ -49,8 +52,15 @@ export function AuditTrail({ events, session }: { events: AuditEntry[]; session:
         </label>
       </div>
       <p className="my-3 text-xs">
-        {t('audit.showing', { shown: Math.min(100, filtered.length), count: filtered.length })}
+        {t('audit.showing', { shown: pagination.visible.length, count: filtered.length })}
       </p>
+      <Pagination
+        page={pagination.page}
+        pageSize={100}
+        count={filtered.length}
+        label={t('pagination.audit')}
+        onPage={pagination.setPage}
+      />
       <div className="max-h-96 overflow-auto">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">{t('audit.caption')}</caption>
@@ -70,7 +80,7 @@ export function AuditTrail({ events, session }: { events: AuditEntry[]; session:
             </tr>
           </thead>
           <tbody>
-            {filtered.slice(0, 100).map((event) => (
+            {pagination.visible.map((event) => (
               <tr className="border-t align-top" key={event.eventId}>
                 <td className="whitespace-nowrap p-2">{new Date(event.at).toLocaleString()}</td>
                 <td className="p-2">{event.action}</td>

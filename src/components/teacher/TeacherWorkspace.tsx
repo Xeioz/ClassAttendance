@@ -27,6 +27,8 @@ import { ManualEntryDialog } from './ManualEntryDialog';
 import { RosterUpload } from './RosterUpload';
 import { ScannerView } from './ScannerView';
 import { SessionForm } from './SessionForm';
+import { usePagination } from '../../hooks/pagination';
+import { Pagination } from '../common/Pagination';
 
 export function TeacherWorkspace({
   keys,
@@ -201,6 +203,7 @@ export function TeacherWorkspace({
         .toLowerCase()
         .includes(query.trim().toLowerCase()),
     ) ?? [];
+  const rosterPagination = usePagination(filtered, 50, JSON.stringify([selectedId, query]));
   return (
     <div className="mb-5 grid gap-5">
       <RosterUpload
@@ -386,6 +389,13 @@ export function TeacherWorkspace({
                 />
               </label>
             </div>
+            <Pagination
+              page={rosterPagination.page}
+              pageSize={50}
+              count={filtered.length}
+              label={t('pagination.roster')}
+              onPage={rosterPagination.setPage}
+            />
             <div className="mt-4 overflow-auto">
               <table className="w-full text-left text-sm">
                 <caption className="sr-only">{t('workspace.caption')}</caption>
@@ -404,7 +414,7 @@ export function TeacherWorkspace({
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((student) => {
+                  {rosterPagination.visible.map((student) => {
                     const entry = attendance.get(student.token);
                     return (
                       <tr key={student.token} className="border-t">

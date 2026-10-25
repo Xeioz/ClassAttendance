@@ -6,6 +6,8 @@ Open the institution's stable HTTPS website in the browser that will hold your r
 
 Create or unlock the teacher workspace using the Master PIN. Use a long random numeric PIN, keep the device locked, and store the secret securely. A forgotten secret cannot be reset to decrypt old records. The teacher view locks after 15 minutes without pointer or keyboard interaction.
 
+You can bookmark the website with `#teacher` to open the teacher entry directly. Switching to Student pass discards the unlocked teacher view; returning requires the PIN again. Expiry is also checked when a suspended page resumes. If the teacher module cannot load, use **Retry teacher workspace** to reload its entry; this does not clear local records.
+
 ## Review and import the roster
 
 Import a CSV with `id,name,section` headers. Choose encoding if the preview looks wrong. Confirm special characters, IDs, section, row count and normalization before saving. Student matching uses section plus canonical ID; a name is not an identity key. Imports cannot run while a session is active.
@@ -27,6 +29,8 @@ A template supplies editable defaults for a new session. Selecting one loads its
 Use **Update selected template** to retain edits, or **Save as new template** to keep a separate version. **Duplicate saved template** copies the saved settings, so save edits first if you want them included. Removing a template requires confirmation; **Keep template** cancels removal. Template editing remains available while a session is active.
 
 Create a session for the correct course and section. Institution, subject and room improve exported reports. The start-time field uses the displayed device timezone. **Class and report timezone** is a separate setting; changing it does not reinterpret the entered start time. Verify both, the grace period, and the room challenge before choosing **Create attendance session**. Announce the challenge to the class. The public challenge is not proof of identity.
+
+Expand **Report details and timezone (optional)** to review those report fields. Collapsing it retains all entered or template values. **Generate room challenge** fills a fresh six-digit challenge, and **Use current time** refreshes the start draft. Review both before explicitly creating the session; these buttons do not start attendance.
 
 ## Pre-class readiness
 
@@ -59,6 +63,8 @@ Review "Not yet recorded" and unresolved disputes before confirming closure. Clo
 To change a closed session, enter a reopening reason. Other active sessions must be closed first. Reopening preserves recorded statuses and explicit teacher absences, while automatic closure absences return to not yet recorded. Close again when review finishes.
 
 ## Reports and recovery
+
+Use Previous page / Next page to browse attendance and audit tables. Search applies to all rows before pagination; downloads still include the complete session. Audit pagination exposes events beyond the first 100.
 
 Download Excel for the summary, complete roster and audit worksheet. CSV is a flat administrative roster export. Active-session exports clearly identify unfinished attendance. The attendance rate is `(present + late) / enrolled`; excused students remain in the denominator. Timestamps in downloads use UTC with the class timezone separately recorded.
 

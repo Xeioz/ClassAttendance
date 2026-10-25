@@ -6,6 +6,7 @@ import { errorMessage } from '../../utils/errors';
 import type { VaultKeys } from '../../types';
 import { BackupControls } from './BackupControls';
 import { TeacherWorkspace } from './TeacherWorkspace';
+import { useInactivityLock } from '../../hooks/inactivityLock';
 
 export function TeacherPortal({ onActive }: { onActive: (active: boolean) => void }) {
   const [keys, setKeys] = useState<VaultKeys>();
@@ -18,6 +19,7 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
   const [persistence, setPersistence] = useState('');
   const pinInput = useRef<HTMLInputElement>(null);
   const confirmationInput = useRef<HTMLInputElement>(null);
+  const unlockAttempt = useRef(0);
   const id = useId();
   useEffect(() => {
     if (busy) return;
@@ -39,29 +41,23 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
     pinInput.current?.focus();
   }
   const lock = useCallback(() => {
+    unlockAttempt.current++;
     setKeys(undefined);
+    setPin('');
+    setConfirmation('');
+    setBusy(false);
     onActive(false);
   }, [onActive]);
+  useInactivityLock(!!keys, lock);
   useEffect(() => {
-    if (!keys) return;
-    let timer: number;
-    const reset = () => {
-      clearTimeout(timer);
-      timer = window.setTimeout(lock, 15 * 60_000);
-    };
-    reset();
-    window.addEventListener('pointerdown', reset);
-    window.addEventListener('keydown', reset);
-    window.addEventListener('pagehide', lock);
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener('pointerdown', reset);
-      window.removeEventListener('keydown', reset);
-      window.removeEventListener('pagehide', lock);
+      unlockAttempt.current++;
     };
-  }, [keys, lock]);
+  }, []);
   async function unlock(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
+    const attempt = ++unlockAttempt.current;
     setError('');
     setErrorField(undefined);
     if (!/^\d{6,12}$/.test(pin)) {
@@ -73,6 +69,7 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
     setBusy(true);
     try {
       const hasVault = Boolean(await db.meta.get('vault'));
+      if (attempt !== unlockAttempt.current) return;
       setExists(hasVault);
       if (!hasVault && pin !== confirmation) {
         setError(t('portal.pinMismatch'));
@@ -81,14 +78,22 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
         return;
       }
       const unlocked = await unlockVault(pin);
+      if (attempt !== unlockAttempt.current) return;
       setKeys(unlocked);
       setPin('');
       setConfirmation('');
-      setPersistence(await requestPersistence());
+      // Storage permission is advisory and must not block or undo authentication.
+      void requestPersistence()
+        .then((message) => {
+          if (attempt === unlockAttempt.current) setPersistence(message);
+        })
+        .catch(() => {
+          if (attempt === unlockAttempt.current) setPersistence(t('portal.persistenceUnknown'));
+        });
     } catch (error) {
-      setError(errorMessage(error));
+      if (attempt === unlockAttempt.current) setError(errorMessage(error));
     } finally {
-      setBusy(false);
+      if (attempt === unlockAttempt.current) setBusy(false);
     }
   }
   return keys ? (

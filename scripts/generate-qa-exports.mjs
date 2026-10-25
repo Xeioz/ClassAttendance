@@ -4,7 +4,13 @@ import path from 'node:path';
 
 const output = path.resolve(process.argv[2] ?? 'artifacts/qa-exports');
 await mkdir(output, { recursive: true });
-const server = await createServer({ configFile: false, server: { middlewareMode: true } });
+// Only SSR-load the export modules. Scanning index.html here would discover the
+// application's virtual PWA import without its plugin and emit a misleading error.
+const server = await createServer({
+  configFile: false,
+  optimizeDeps: { noDiscovery: true },
+  server: { middlewareMode: true },
+});
 try {
   const { buildExcelReport } = await server.ssrLoadModule('/src/utils/excel.ts');
   const { attendanceCSV } = await server.ssrLoadModule('/src/utils/csvExport.ts');

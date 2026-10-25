@@ -2,6 +2,8 @@
 
 A browser-based QR attendance website built with React 19, TypeScript, Vite, Tailwind, Dexie, WebCrypto, PapaParse, qrcode, html5-qrcode, ExcelJS, and Workbox. No native application or installation is required.
 
+Version 0.3.0 adds direct `#student` / `#teacher` navigation, deferred teacher loading with retry, safer vault locking, simpler session preparation, complete audit pagination, and production CSP. See the [modernization report](docs/implementation-plan/10-final-implementation-report.md) for changes, 190-test validation, browser evidence and remaining release blockers.
+
 ## Run
 
 Requires Node 22.18+ or Node 24 and pnpm. The first dependency installation requires internet access.
