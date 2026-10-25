@@ -18,5 +18,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+      - run: pnpm check:budgets
+      - run: pnpm qa:exports
       - name: Build for repository subpath
         run: pnpm build --base=/ClassAttendance/
+      - run: pnpm check:budgets

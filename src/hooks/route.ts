@@ -4,16 +4,20 @@ import { isTeacherBusy } from '../domain/operations';
 export function navigate(path: string) {
   if (!isTeacherBusy()) window.location.hash = path;
 }
+function currentPath() {
+  const raw = location.hash.slice(1) || '/';
+  return raw === 'student' || raw === 'teacher' ? `/${raw}` : raw;
+}
 export function useRoute() {
-  const [path, setPath] = useState(() => location.hash.slice(1) || '/');
+  const [path, setPath] = useState(() => currentPath());
   useEffect(() => {
-    let accepted = location.hash.slice(1) || '/';
+    let accepted = currentPath();
     const sync = () => {
       if (isTeacherBusy()) {
         history.replaceState(null, '', `${location.pathname}${location.search}#${accepted}`);
         return;
       }
-      accepted = location.hash.slice(1) || '/';
+      accepted = currentPath();
       setPath(accepted);
       document.getElementById('main')?.focus();
     };

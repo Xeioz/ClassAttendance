@@ -114,7 +114,7 @@ describe('role and teacher journeys', () => {
     await screen.findByRole('heading', { name: 'Add a class' });
     fireEvent.change(screen.getByLabelText('Course code'), { target: { value: 'IT301' } });
     fireEvent.change(screen.getByLabelText('Section'), { target: { value: 'BSIT-3A' } });
-    fireEvent.change(screen.getByLabelText('Term (optional)'), { target: { value: '2026 / 1' } });
+    fireEvent.change(screen.getByLabelText('Term'), { target: { value: '2026 / 1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create class and add students' }));
     await screen.findByRole('heading', { name: 'Class roster' });
     const classes = await listClasses(await unlockVault('104928573612'));

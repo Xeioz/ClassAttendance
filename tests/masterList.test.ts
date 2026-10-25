@@ -171,7 +171,7 @@ describe('atomic master-list import', () => {
   });
   it('rolls back all newly created classes and students when enrollment persistence fails', async () => {
     const failure = vi
-      .spyOn(db.enrollments, 'put')
+      .spyOn(db.enrollments, 'bulkAdd')
       .mockRejectedValueOnce(new Error('Quota exceeded'));
     await expect(importMasterList(keys, draft())).rejects.toThrow('Quota');
     failure.mockRestore();

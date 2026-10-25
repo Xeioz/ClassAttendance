@@ -1,3 +1,7 @@
+import { LegacyTemplates } from './LegacyTemplates';
+import { Pagination } from '../common/Pagination';
+import { usePagination } from '../../hooks/pagination';
+import { PreClassReadiness } from './PreClassReadiness';
 import { useCallback, useEffect, useState } from 'react';
 import { db } from '../../db/db';
 import { listSessions, listStudents } from '../../domain/attendance';
@@ -105,6 +109,7 @@ export function TeacherWorkspace({
       alive = false;
     };
   }, [keys, classId, revision, path]);
+  const rosterPage = usePagination(members, 50, classId ?? '');
   const classPath = (id: string, suffix = 'overview') => `/teacher/classes/${id}/${suffix}`;
   const sessionPath = (session: Session) =>
     session.classId
@@ -124,7 +129,7 @@ export function TeacherWorkspace({
   }
   if (!loaded) return <p role="status">Loading your classes and records…</p>;
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="grid items-start gap-6 lg:grid-cols-[256px_minmax(0,1fr)]">
       {workspaceNotice && root && (
         <p
           role="status"
@@ -135,7 +140,7 @@ export function TeacherWorkspace({
       )}
       <aside
         aria-label="Classes and sessions"
-        className={`card min-w-0 ${root ? '' : 'hidden lg:block'}`}
+        className={`card workspace-sidebar min-w-0 ${root ? '' : 'hidden lg:block'}`}
       >
         {active && (
           <button
@@ -254,9 +259,9 @@ export function TeacherWorkspace({
           <MasterListImport
             keys={keys}
             disabled={Boolean(active) || busy}
-            onSaved={async () => {
+            onSaved={async (result) => {
               setWorkspaceNotice(
-                'Master list saved. Choose a class to review enrollment or start attendance.',
+                `Master list saved: ${result.createdClasses} new classes, ${result.matchedClasses} matched classes and ${result.addedEnrollments} new enrollments. Choose a class to review or start attendance.`,
               );
               await refresh();
               navigate('/teacher');
@@ -280,7 +285,10 @@ export function TeacherWorkspace({
             }}
           />
         ) : parts[1] === 'settings' ? (
-          <BackupControls keys={keys} />
+          <>
+            <BackupControls keys={keys} />
+            <LegacyTemplates keys={keys} />
+          </>
         ) : parts[1] === 'unassigned' && !sessionId ? (
           <section className="card">
             <p className="eyebrow">Legacy review</p>
@@ -370,7 +378,7 @@ export function TeacherWorkspace({
               <p className="mt-2 text-slate-600">
                 {offering.subject || 'Class workspace'} · {members.length} enrolled
               </p>
-              <nav aria-label="Class tasks" className="mt-5 flex flex-wrap gap-2">
+              <nav aria-label="Class tasks" className="workspace-tabs mt-5 flex flex-wrap">
                 {['overview', 'roster', 'history', 'defaults', 'start'].map((item) => (
                   <button
                     key={item}
@@ -379,7 +387,13 @@ export function TeacherWorkspace({
                     disabled={busy || (item === 'start' && Boolean(active))}
                     onClick={() => navigate(classPath(offering.id, item))}
                   >
-                    {item === 'start' ? 'Start attendance' : item[0].toUpperCase() + item.slice(1)}
+                    {item === 'start'
+                      ? 'Start attendance'
+                      : item === 'history'
+                        ? 'Sessions'
+                        : item === 'defaults'
+                          ? 'Class defaults'
+                          : item[0].toUpperCase() + item.slice(1)}
                   </button>
                 ))}
               </nav>
@@ -460,7 +474,7 @@ export function TeacherWorkspace({
                 <section className="card">
                   <h3 className="mb-4 text-lg">Enrolled students ({members.length})</h3>
                   <ul className="divide-y">
-                    {members.map((student) => (
+                    {rosterPage.visible.map((student) => (
                       <li key={student.token} className="py-3">
                         <span className="font-semibold">{student.name}</span>
                         <span className="ml-3 font-mono text-sm">
@@ -469,6 +483,13 @@ export function TeacherWorkspace({
                       </li>
                     ))}
                   </ul>
+                  <Pagination
+                    page={rosterPage.page}
+                    pageSize={50}
+                    count={members.length}
+                    label="Class roster pages"
+                    onPage={rosterPage.setPage}
+                  />
                   {!members.length && (
                     <p>Import a CSV or review the existing section roster above.</p>
                   )}
@@ -477,6 +498,17 @@ export function TeacherWorkspace({
             ) : task === 'overview' ? (
               <section className="card">
                 <h3 className="text-xl">Ready for your next class?</h3>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="metric">
+                    <p className="text-sm text-slate-600">Enrolled</p>
+                    <strong className="text-3xl">{members.length}</strong>
+                  </div>
+                  <div className="metric">
+                    <p className="text-sm text-slate-600">Saved sessions</p>
+                    <strong className="text-3xl">{classHistory.length}</strong>
+                  </div>
+                </div>
+                <PreClassReadiness offering={offering} members={members.length} active={active} />
                 <p className="my-4 text-slate-600">
                   {members.length
                     ? `${members.length} students enrolled. Review the start time and ${offering.graceMinutes}-minute default grace period before scanning.`
@@ -520,9 +552,10 @@ function SessionList({
   open: (session: Session) => void;
   disabled: boolean;
 }) {
+  const pages = usePagination(sessions, 25, sessions.map((item) => item.id).join(','));
   return (
     <div className="grid gap-3">
-      {sessions.map((session) => (
+      {pages.visible.map((session) => (
         <button
           key={session.id}
           className="secondary justify-between gap-4 text-left"
@@ -538,6 +571,13 @@ function SessionList({
           <span className="text-xs">{session.state === 'ACTIVE' ? '● Resume' : 'Closed →'}</span>
         </button>
       ))}
+      <Pagination
+        page={pages.page}
+        pageSize={25}
+        count={sessions.length}
+        label="Session history pages"
+        onPage={pages.setPage}
+      />
     </div>
   );
 }

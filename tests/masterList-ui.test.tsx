@@ -102,7 +102,7 @@ describe('import-first teacher workflow', () => {
       target: { value: 'Web Systems' },
     });
     const failure = vi
-      .spyOn(db.enrollments, 'put')
+      .spyOn(db.enrollments, 'bulkAdd')
       .mockRejectedValueOnce(new Error('Quota exceeded'));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm and save master list' }));
     await screen.findByRole('alert');

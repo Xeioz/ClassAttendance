@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { normalizeId } from '../../utils/normalize';
-import { errorMessage } from '../../utils/errors';
+import { t } from '../../i18n';
 import { DynamicQR } from './DynamicQR';
 
 function rememberedId(): string {
@@ -16,43 +16,61 @@ export function StudentPass() {
   const [remember, setRemember] = useState(() => Boolean(rememberedId()));
   const [pass, setPass] = useState<{ id: string; ch: string }>();
   const [error, setError] = useState('');
+  const [errorField, setErrorField] = useState<'id' | 'challenge'>();
+  const idInput = useRef<HTMLInputElement>(null);
+  const challengeInput = useRef<HTMLInputElement>(null);
+  const fieldId = useId();
   function submit(event: FormEvent) {
     event.preventDefault();
+    setError('');
+    setErrorField(undefined);
+    let normalized: string;
     try {
-      const normalized = normalizeId(id);
-      if (!/^\d{3,6}$/.test(challenge))
-        throw new Error('Enter the 3–6 digit room challenge shown by your teacher.');
-      setError('');
-      try {
-        if (remember) localStorage.setItem('attendance:student-id:v1', normalized);
-        else localStorage.removeItem('attendance:student-id:v1');
-      } catch {
-        setError('ID could not be remembered. Your pass still works.');
-      }
-      setPass({ id: normalized, ch: challenge });
-    } catch (error) {
-      setError(errorMessage(error));
+      normalized = normalizeId(id);
+    } catch {
+      setError(t('student.idInvalid'));
+      setErrorField('id');
+      idInput.current?.focus();
+      return;
     }
+    if (!/^\d{3,6}$/.test(challenge)) {
+      setError(t('student.challengeHint'));
+      setErrorField('challenge');
+      challengeInput.current?.focus();
+      return;
+    }
+    try {
+      if (remember) localStorage.setItem('attendance:student-id:v1', normalized);
+      else localStorage.removeItem('attendance:student-id:v1');
+    } catch {
+      setError(t('student.rememberFailed'));
+    }
+    setPass({ id: normalized, ch: challenge });
   }
   return (
     <section className="card mx-auto max-w-lg">
-      <p className="eyebrow">Student check-in</p>
-      <h2 className="mb-2 mt-2 text-2xl">Your classroom pass</h2>
-      <p className="mb-6 text-sm text-slate-600">
-        Use your official ID and the challenge provided in class.
-      </p>
+      <p className="eyebrow">{t('student.eyebrow')}</p>
+      <h2 className="mb-2 mt-2 text-2xl">{t('student.title')}</h2>
+      <p className="mb-6 text-sm text-slate-600">{t('student.description')}</p>
       {pass ? (
         <>
           <DynamicQR id={pass.id} challenge={pass.ch} />
-          <button className="secondary mt-5 w-full" onClick={() => setPass(undefined)}>
-            Edit ID or challenge
+          <button
+            type="button"
+            className="secondary mt-5 w-full"
+            onClick={() => setPass(undefined)}
+          >
+            {t('student.edit')}
           </button>
         </>
       ) : (
-        <form onSubmit={submit} className="grid gap-5">
+        <form noValidate onSubmit={submit} className="grid gap-5">
           <label>
-            Student ID
+            {t('student.id')}
             <input
+              ref={idInput}
+              aria-invalid={errorField === 'id'}
+              aria-describedby={errorField === 'id' ? `${fieldId}-error` : undefined}
               autoComplete="off"
               value={id}
               onChange={(event) => setId(event.target.value)}
@@ -62,12 +80,15 @@ export function StudentPass() {
             />
           </label>
           <label>
-            Room challenge
+            {t('student.challenge')}
             <input
+              ref={challengeInput}
+              aria-invalid={errorField === 'challenge'}
+              aria-describedby={errorField === 'challenge' ? `${fieldId}-error` : undefined}
               inputMode="numeric"
               value={challenge}
               onChange={(event) => setChallenge(event.target.value)}
-              placeholder="Ask your teacher"
+              placeholder={t('student.challengePlaceholder')}
               pattern="[0-9]{3,6}"
               maxLength={6}
               required
@@ -80,9 +101,9 @@ export function StudentPass() {
               onChange={(event) => setRemember(event.target.checked)}
               className="h-6 min-h-0 w-6"
             />
-            Remember my ID on this browser
+            {t('student.remember')}
           </label>
-          <button className="btn">Display QR pass</button>
+          <button className="btn">{t('student.display')}</button>
           <button
             type="button"
             className="secondary"
@@ -92,16 +113,17 @@ export function StudentPass() {
                 setId('');
                 setRemember(false);
               } catch {
-                setError('Unable to clear remembered ID. Use browser site-data settings.');
+                setError(t('student.forgetFailed'));
+                setErrorField(undefined);
               }
             }}
           >
-            Forget saved ID
+            {t('student.forget')}
           </button>
         </form>
       )}
       {error ? (
-        <p role="alert" className="notice mt-4">
+        <p id={`${fieldId}-error`} role="alert" className="notice mt-4">
           {error}
         </p>
       ) : null}

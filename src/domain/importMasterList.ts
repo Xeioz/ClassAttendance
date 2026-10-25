@@ -1,12 +1,51 @@
 import Dexie from 'dexie';
 import { db } from '../db/db';
 import { decrypt, encrypt, privateToken } from '../db/crypto';
-import type { ClassPrivate, ClassRow, StudentPrivate, StudentRow, VaultKeys } from '../types';
-import { classIdentity, inspectMasterDraft, type MasterClassDraft } from './masterListDraft';
+import type {
+  ClassPrivate,
+  ClassRow,
+  StudentPrivate,
+  StudentRow,
+  Student,
+  ClassOffering,
+  VaultKeys,
+} from '../types';
+import {
+  classIdentity,
+  personIdentity,
+  inspectMasterDraft,
+  type MasterClassDraft,
+  type NameApprovals,
+} from './masterListDraft';
 import { teacherOperation } from './operations';
 
+export async function readImportSnapshot(keys: VaultKeys) {
+  const snapshot = await db.transaction('r', [db.meta, db.classes, db.students], async () => {
+    if ((await db.meta.get('vault'))?.salt !== keys.salt)
+      throw new Error('Vault changed. Unlock again.');
+    return { classes: await db.classes.toArray(), students: await db.students.toArray() };
+  });
+  const students: Student[] = await Promise.all(
+    snapshot.students.map(async (row) => ({
+      token: row.token,
+      ...(await decrypt<StudentPrivate>(keys.encryption, row.encrypted, `student:${row.token}`)),
+    })),
+  );
+  const classes: ClassOffering[] = await Promise.all(
+    snapshot.classes.map(async (row) => ({
+      id: row.id,
+      ...(await decrypt<ClassPrivate>(keys.encryption, row.encrypted, `class:${row.id}`)),
+    })),
+  );
+  return { students, classes, fingerprint: JSON.stringify(snapshot) };
+}
+
 export const importMasterList = teacherOperation(
-  async (keys: VaultKeys, draft: MasterClassDraft[]) => {
+  async (
+    keys: VaultKeys,
+    draft: MasterClassDraft[],
+    options: { expectedSnapshot?: string; approvals?: NameApprovals } = {},
+  ) => {
     const validation = inspectMasterDraft(draft);
     if (validation.issues.length) throw new Error(validation.issues[0].message);
     const snapshot = await db.classes.toArray();
@@ -60,25 +99,48 @@ export const importMasterList = teacherOperation(
           throw new Error('Close the active session before importing a master list.');
         if (JSON.stringify(await db.classes.toArray()) !== JSON.stringify(snapshot))
           throw new Error('Classes changed in another tab. Review and retry the import.');
-        for (const { row, data } of students.values()) {
-          const prior = await db.students.get(row.token);
+        if (
+          options.expectedSnapshot !== undefined &&
+          JSON.stringify({
+            classes: await db.classes.toArray(),
+            students: await db.students.toArray(),
+          }) !== options.expectedSnapshot
+        )
+          throw new Error(
+            'Master list changed in another tab. Review the refreshed preview and approve changes again.',
+          );
+        const changedStudents: StudentRow[] = [];
+        const entries = [...students.values()];
+        const priorStudents = await db.students.bulkGet(entries.map((item) => item.row.token));
+        for (const [index, { row, data }] of entries.entries()) {
+          const prior = priorStudents[index];
           if (prior) {
             const value = await Dexie.waitFor(
               decrypt<StudentPrivate>(keys.encryption, prior.encrypted, `student:${row.token}`),
             );
-            if (value.name !== data.name)
+            const approval = options.approvals?.[personIdentity(data.section, data.id)];
+            if (
+              value.name !== data.name &&
+              (approval?.before !== value.name || approval?.after !== data.name)
+            )
               throw new Error(
                 `Name conflict for ${data.id}: existing name is ${value.name}. Correct the preview and retry.`,
               );
-          }
+            if (
+              value.name !== data.name ||
+              (value.displayId ?? value.id) !== (data.displayId ?? data.id)
+            )
+              changedStudents.push(row);
+          } else changedStudents.push(row);
         }
         await db.classes.bulkAdd(added);
-        await db.students.bulkPut([...students.values()].map((student) => student.row));
-        for (const membership of memberships) {
-          if (!(await db.enrollments.get([membership.classId, membership.studentToken])))
-            addedEnrollments++;
-          await db.enrollments.put(membership);
-        }
+        await db.students.bulkPut(changedStudents);
+        const currentMemberships = await db.enrollments.bulkGet(
+          memberships.map((item) => [item.classId, item.studentToken] as [string, string]),
+        );
+        const additions = memberships.filter((_, index) => !currentMemberships[index]);
+        addedEnrollments = additions.length;
+        await db.enrollments.bulkAdd(additions);
       },
     );
     return {
@@ -91,3 +153,5 @@ export const importMasterList = teacherOperation(
     };
   },
 );
+
+export type MasterImportResult = Awaited<ReturnType<typeof importMasterList>>;

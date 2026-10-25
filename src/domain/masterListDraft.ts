@@ -73,13 +73,25 @@ export function groupMasterRows(
   return [...groups.values()];
 }
 
-export function inspectMasterDraft(groups: MasterClassDraft[], existing: Student[] = []) {
+export interface NameApproval {
+  before: string;
+  after: string;
+}
+export type NameApprovals = Record<string, NameApproval>;
+export const personIdentity = (section: string, id: string) =>
+  JSON.stringify([sectionKey(section), normalizeId(id)]);
+export function inspectMasterDraft(
+  groups: MasterClassDraft[],
+  existing: Student[] = [],
+  approvals: NameApprovals = {},
+) {
   const issues: MasterIssue[] = [];
   const prepared = new Map<string, PreparedMasterClass>();
   const enrollment = new Set<string>();
-  const names = new Map(
-    existing.map((student) => [JSON.stringify([student.section, student.id]), student.name]),
+  const existingNames = new Map(
+    existing.map((student) => [personIdentity(student.section, student.id), student.name]),
   );
+  const names = new Map<string, string>();
   const total = groups.reduce((count, group) => count + group.students.length, 0);
   if (!groups.length || groups.length > 1000 || total < 1 || total > 10000)
     issues.push({
@@ -150,6 +162,18 @@ export function inspectMasterDraft(groups: MasterClassDraft[], existing: Student
           );
         enrollment.add(membership);
         const person = JSON.stringify([data.section, id]);
+        const before = existingNames.get(person);
+        if (
+          name &&
+          before !== undefined &&
+          before !== name &&
+          (approvals[person]?.before !== before || approvals[person]?.after !== name)
+        )
+          add(
+            'name',
+            `File row ${row.sourceRow}: ${id} already has name “${before}”. Review and approve this name change below.`,
+            row.key,
+          );
         if (name && names.has(person) && names.get(person) !== name)
           add(
             'name',

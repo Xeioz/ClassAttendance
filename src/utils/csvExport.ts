@@ -6,6 +6,24 @@ import { downloadFile } from './download';
 export function spreadsheetSafe(value: string): string {
   return /^[\s]*[=+@-]|^[\t\r\n]/.test(value) ? `'${value}` : value;
 }
+export const CSV_HEADERS = [
+  'Student ID',
+  'Official name',
+  'Section',
+  'Status',
+  'Recorded / corrected (UTC)',
+  'Last changed (UTC)',
+  'Source',
+  'Reason',
+  'Institution',
+  'Course',
+  'Subject',
+  'Room',
+  'Class date',
+  'Timezone',
+  'Session ID',
+  'Session state',
+];
 export function attendanceCSV(
   session: Session,
   attendance: Map<string, AttendancePrivate>,
@@ -35,7 +53,13 @@ export function attendanceCSV(
     .map((row) =>
       Object.fromEntries(Object.entries(row).map(([key, value]) => [key, spreadsheetSafe(value)])),
     );
-  return '\uFEFF' + Papa.unparse(rows, { newline: '\r\n' });
+  return (
+    '\uFEFF' +
+    Papa.unparse(
+      { fields: CSV_HEADERS, data: rows.map((row) => CSV_HEADERS.map((field) => row[field])) },
+      { newline: '\r\n' },
+    )
+  );
 }
 export function exportCSV(session: Session, attendance: Map<string, AttendancePrivate>): void {
   downloadFile(

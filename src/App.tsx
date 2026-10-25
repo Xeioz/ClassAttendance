@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { OfflineStatus } from './components/common/OfflineStatus';
 import { StudentPass } from './components/student/StudentPass';
-import { TeacherPortal } from './components/teacher/TeacherPortal';
+import { TeacherEntry } from './components/teacher/TeacherEntry';
 import { navigate, useRoute } from './hooks/route';
 import { useTeacherBusy } from './domain/operations';
 
@@ -77,7 +77,9 @@ export function App() {
             {databaseMessage}
           </p>
         )}
-        <div className="mb-6">
+        <div
+          className={`mb-6 ${role === 'landing' ? 'landing-intro' : role === 'student' ? 'text-center' : 'workspace-heading'}`}
+        >
           <p className="eyebrow">Portable QR attendance · Browser based</p>
           <h1 className="mt-3 text-3xl sm:text-4xl">
             {role === 'student'
@@ -94,17 +96,28 @@ export function App() {
                 : 'Choose your role to get started.'}
           </p>
         </div>
-        <OfflineStatus active={active || busy} student={role === 'student'} />
         {role === 'student' ? (
-          <StudentPass />
+          <div className="student-layout">
+            <StudentPass />
+            <div className="student-help">
+              <OfflineStatus active={active || busy} student />
+              <p className="mt-4 text-sm text-slate-600">
+                A QR pass alone does not record attendance. Wait for your teacher to confirm it was
+                saved.
+              </p>
+            </div>
+          </div>
         ) : role === 'teacher' ? (
-          <TeacherPortal onActive={setActive} />
+          <TeacherEntry onActive={setActive} />
         ) : (
-          <div className="mx-auto grid max-w-4xl gap-5 sm:grid-cols-2">
+          <div className="mx-auto grid max-w-3xl gap-5 sm:grid-cols-2">
             <button
-              className="card text-left hover:border-emerald-700"
+              className="card role-card text-left hover:border-emerald-700"
               onClick={() => navigate('/student')}
             >
+              <span className="role-symbol" aria-hidden="true">
+                ▧
+              </span>
               <span className="eyebrow">Student</span>
               <span className="mt-4 block text-2xl font-semibold">I am a Student →</span>
               <span className="mt-3 block text-sm font-normal text-slate-600">
@@ -112,15 +125,23 @@ export function App() {
               </span>
             </button>
             <button
-              className="card text-left hover:border-emerald-700"
+              className="card role-card text-left hover:border-emerald-700"
               onClick={() => navigate('/teacher')}
             >
+              <span className="role-symbol" aria-hidden="true">
+                ▦
+              </span>
               <span className="eyebrow">Teacher</span>
               <span className="mt-4 block text-2xl font-semibold">I am a Teacher →</span>
               <span className="mt-3 block text-sm font-normal text-slate-600">
                 Unlock your records, choose a class and take attendance.
               </span>
             </button>
+          </div>
+        )}
+        {role !== 'student' && (
+          <div className="mt-6">
+            <OfflineStatus active={active || busy} />
           </div>
         )}
         {busy && (

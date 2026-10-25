@@ -4,9 +4,11 @@ import { errorMessage } from '../../utils/errors';
 export function ClassForm({
   onSave,
   initial,
+  copyDefaults = false,
 }: {
   onSave: (input: ClassPrivate) => Promise<void>;
   initial?: ClassPrivate;
+  copyDefaults?: boolean;
 }) {
   const [input, setInput] = useState<ClassPrivate>(
     initial ?? {
@@ -38,7 +40,9 @@ export function ClassForm({
     <form className="card grid gap-5" onSubmit={submit}>
       <div>
         <p className="eyebrow">Class setup</p>
-        <h2 className="mt-2 text-2xl">{initial ? 'Class defaults' : 'Add a class'}</h2>
+        <h2 className="mt-2 text-2xl">
+          {initial && !copyDefaults ? 'Class defaults' : 'Add a class'}
+        </h2>
         <p className="mt-3 text-sm text-slate-600">
           Course + section + term identify this offering. Enrollment and historical sessions stay
           separate from other classes.
@@ -51,16 +55,18 @@ export function ClassForm({
               {
                 course: 'Course code',
                 section: 'Section',
-                term: 'Term (optional)',
+                term: 'Term',
                 subject: 'Subject (optional)',
                 institution: 'Institution (optional)',
                 room: 'Room (optional)',
               }[field]
             }
             <input
-              readOnly={Boolean(initial) && ['course', 'section', 'term'].includes(field)}
+              readOnly={
+                Boolean(initial) && !copyDefaults && ['course', 'section', 'term'].includes(field)
+              }
               value={input[field]}
-              required={field === 'course' || field === 'section'}
+              required={field === 'course' || field === 'section' || field === 'term'}
               maxLength={100}
               onChange={(event) => setInput({ ...input, [field]: event.target.value })}
             />
@@ -92,7 +98,11 @@ export function ClassForm({
         the report timezone controls date grouping.
       </p>
       <button className="btn justify-self-start" disabled={busy}>
-        {busy ? 'Saving…' : initial ? 'Save defaults' : 'Create class and add students'}
+        {busy
+          ? 'Saving…'
+          : initial && !copyDefaults
+            ? 'Save defaults'
+            : 'Create class and add students'}
       </button>
       {error && (
         <p role="alert" className="notice">

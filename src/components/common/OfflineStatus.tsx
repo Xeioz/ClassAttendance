@@ -1,7 +1,8 @@
+import { verifyOfflineResources } from '../../utils/offline';
 import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { errorMessage } from '../../utils/errors';
-import { db, requestPersistence } from '../../db/db';
+import { requestPersistence } from '../../db/persistence';
 import { teacherOperation } from '../../domain/operations';
 
 export function OfflineStatus({ active, student = false }: { active: boolean; student?: boolean }) {
@@ -37,29 +38,13 @@ export function OfflineStatus({ active, student = false }: { active: boolean; st
   async function check() {
     setChecking(true);
     try {
-      const controller = navigator.serviceWorker?.controller;
-      if (!controller)
-        throw new Error(
-          'Offline worker is not controlling this page yet. Wait for preparation, then reload the production website and retry.',
-        );
-      const ready = await new Promise<boolean>((resolve, reject) => {
-        const channel = new MessageChannel();
-        const timer = setTimeout(() => {
-          channel.port1.close();
-          reject(new Error('Offline check timed out. Reconnect and retry.'));
-        }, 10000);
-        channel.port1.onmessage = (event) => {
-          clearTimeout(timer);
-          channel.port1.close();
-          resolve(event.data?.ready === true);
-        };
-        controller.postMessage({ type: 'CHECK_OFFLINE' }, [channel.port2]);
-      });
-      if (!ready || controller !== navigator.serviceWorker.controller)
-        throw new Error(
-          'Required resources are incomplete or the website changed. Reconnect and retry.',
-        );
+      const checkedController = navigator.serviceWorker?.controller;
+      await verifyOfflineResources();
       const persistence = await requestPersistence();
+      if (checkedController !== navigator.serviceWorker?.controller)
+        throw new Error(
+          'Website version changed during preparation. Check offline readiness again.',
+        );
       setVerified(true);
       setMessage(
         `Current website resources verified. Test reopening your saved link without a connection. ${persistence}`,
@@ -77,6 +62,7 @@ export function OfflineStatus({ active, student = false }: { active: boolean; st
         throw new Error(
           'After attendance, close all Attendance Desk tabs and reopen your saved student link to allow the update.',
         );
+      const { db } = await import('../../db/db');
       await teacherOperation(async () => {
         if (active || (await db.sessions.where('state').equals('ACTIVE').count()))
           throw new Error('Close the active attendance session before updating.');
@@ -87,7 +73,7 @@ export function OfflineStatus({ active, student = false }: { active: boolean; st
     }
   }
   return (
-    <aside className="mb-6 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm">
+    <aside className="offline-panel rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p>
           <strong>{online ? 'Network available' : 'Offline'}</strong> ·{' '}

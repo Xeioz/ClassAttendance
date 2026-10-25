@@ -1,6 +1,6 @@
 # Attendance Desk
 
-A browser-based QR attendance website built with React 19, TypeScript, Vite, Tailwind, Dexie, WebCrypto, PapaParse, qrcode, html5-qrcode, SheetJS, and Workbox. No native application or installation is required.
+A browser-based QR attendance website built with React 19, TypeScript, Vite, Tailwind, Dexie, WebCrypto, PapaParse, qrcode, html5-qrcode, SheetJS (import), ExcelJS (reports), and Workbox. No native application or installation is required.
 
 ## Run
 
@@ -39,12 +39,14 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 5. Verify identity, start the teacher camera and scan. Manual attendance (F2), sound, torch and compatibility decoding remain available. Success feedback follows a committed save.
 6. Choose **Review attendance** to pause the camera, review unrecorded students and resolve disputes. Confirm closure to fill automatic absences. Closed results are read-only; reopening requires a reason.
 7. Download Excel/CSV and use **Backup & storage** for an encrypted backup. Check the browser saved the files and keep the backup outside the recording device.
-8. To restore, lock records and select the archive with its original PIN. Confirm full replacement. Version 2 archives include classes/enrollment; version 1 archives restore original records for explicit class review.
+8. To restore, lock records and select the archive with its original PIN. Confirm full replacement. New version 3 archives retain classes, enrollment, legacy templates and migration metadata. Version 1 and both recognized version 2 archive formats remain readable. Unknown or ambiguous formats are rejected before replacement.
 9. Existing sessions appear under **Unassigned records**. Create the matching course/section/term, then associate each session. This preserves its IDs, attendance, audit and snapshot. Existing section students are copied into a class only after explicit roster review.
 
 Desktop uses class navigation beside the selected workspace. Narrow screens use full-width class and task views with **Back to classes**. Resizing does not mount a second scanner. Defaults apply only to future sessions.
 
 See [master-list import workflow](docs/master-list-import.md) for templates, validation and limits.
+
+See [lightweight UI integration and compatibility validation](docs/prototypev2-modernized-release.md) for the current update.
 
 See [prototypev2 implementation and validation](docs/prototypev2-release.md) for migration, recovery and remaining device checks.
 
