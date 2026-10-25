@@ -1,0 +1,77 @@
+const roster: Record<string, string> = {
+  'roster.title': 'Class roster',
+  'roster.description':
+    'CSV columns: id, name, section. Import merges by section and canonical ID. Close active sessions first. Names alone never identify a student.',
+  'roster.encoding': 'File encoding',
+  'roster.encodingAuto': 'UTF-8 check / Windows-1252 fallback',
+  'roster.encodingFallback': 'windows-1252 (fallback; confirm preview)',
+  'roster.chooseFile': 'Choose or drop a CSV',
+  'roster.reading': 'Reading and comparing roster…',
+  'roster.loaded': '{count} students · {encoding}. Check every change before saving.',
+  'roster.total': 'Total parsed rows: {count}.',
+  'roster.category.added': 'Added',
+  'roster.category.updated': 'Updated',
+  'roster.category.unchanged': 'Unchanged',
+  'roster.category.invalid': 'Invalid rows',
+  'roster.category.conflict': 'Identity conflicts',
+  'roster.categoryCount': '{category}: {count}',
+  'roster.proposed': 'Proposed writes: {added} additions and {updated} updates.',
+  'roster.sections': 'Sections: {sections}.',
+  'roster.scope':
+    'Saving applies the entire reviewed file, including rows outside the current search. Students omitted from the file remain enrolled. Existing session history stays unchanged.',
+  'roster.blockingRule':
+    'Nothing can be saved while the file contains invalid rows or identity conflicts. Correct all listed rows in the CSV and choose the corrected file again. No rows are silently excluded.',
+  'roster.confirmIdentity':
+    'Changed details require confirmation: check the existing and proposed name and displayed ID, then approve each update only if it is the same student. Otherwise correct the file. {count} updates still need approval.',
+  'roster.search': 'Search roster preview',
+  'roster.searchPlaceholder': 'Row, displayed ID, canonical ID, name or section',
+  'roster.filter': 'Filter change category',
+  'roster.allRows': 'All rows',
+  'roster.showing': 'Showing {first}–{last} of {matches} matching students ({total} total).',
+  'roster.noMatches': 'No matching students ({total} total).',
+  'roster.tableRegion': 'Scrollable roster review',
+  'roster.tableCaption': 'Complete roster change review',
+  'roster.column.row': 'CSV row',
+  'roster.column.category': 'Change',
+  'roster.column.displayId': 'Displayed ID',
+  'roster.column.canonicalId': 'Canonical ID',
+  'roster.column.name': 'Name',
+  'roster.column.section': 'Section',
+  'roster.column.review': 'Review or issue',
+  'roster.before': 'Existing: {value}',
+  'roster.after': 'Proposed: {value}',
+  'roster.approveRow': 'Approve update for row {row}, ID {id}; this is the same student',
+  'roster.noAction': 'No confirmation needed',
+  'roster.pages': 'Roster preview pages',
+  'roster.previous': 'Previous preview page',
+  'roster.next': 'Next preview page',
+  'roster.saving': 'Saving…',
+  'roster.save': 'Save {added} additions and {updated} updates',
+  'roster.cancel': 'Cancel roster review',
+  'roster.cancelled': 'Roster review cancelled. Stored records are unchanged.',
+  'roster.saved':
+    'Roster saved encrypted. Added: {added}; updated: {updated}; unchanged: {unchanged}.',
+  'roster.stale':
+    'The roster changed while you were reviewing it. Refresh the comparison and review again before saving or starting a session.',
+  'roster.refreshed':
+    'The roster changed in another operation. The comparison is refreshed and earlier approvals are cleared. Review the new counts and changes, then save again.',
+  'roster.vaultChanged': 'The vault changed in another tab. Lock and unlock again.',
+  'roster.requiredFields': 'Every row needs a student ID, name and section.',
+  'roster.invalidNameSection':
+    'Enter a name of 1–200 characters and a section of 1–100 characters.',
+  'roster.invalidDisplayId': 'The displayed ID must normalize to the same canonical student ID.',
+  'roster.duplicateIdentity': 'Duplicate or colliding student ID: {id}',
+  'roster.rowLimit': 'Import between 1 and 10,000 students.',
+  'roster.fileLimit': 'Roster must be smaller than 5 MB.',
+  'roster.csvError': 'CSV row {row}: {message}',
+  'roster.requiredHeaders': 'Required column headers: id, name, section.',
+  'roster.columnMismatch':
+    'The row has a different number of fields from the header. Correct the CSV columns.',
+  'roster.fileConflict':
+    'Duplicate or normalization collision in rows {rows}. These IDs match the same student in the same section. Correct the file so each identity appears once.',
+  'roster.rowIssue': 'Row {row}: {message}',
+  'roster.approvalsRequired':
+    'Confirm each changed identity before saving, or correct the CSV and review again.',
+  'roster.closeActive': 'Close active sessions before importing a roster.',
+};
+export default roster;

@@ -114,7 +114,7 @@ describe('prototypev2 compatibility', () => {
     await copyLegacyEnrollment(keys, a.id);
     expect(await db.enrollments.count()).toBe(1);
   });
-  it('round-trips v2 classes and memberships and rejects orphan membership before replacement', async () => {
+  it('round-trips v3 classes and memberships and rejects orphan membership before replacement', async () => {
     const a = await createClass(keys, base);
     await saveRoster(keys, [student], a.id);
     const session = await createSession(keys, { ...settings, classId: a.id });
@@ -122,17 +122,17 @@ describe('prototypev2 compatibility', () => {
     await exportBackup(keys);
     const file = new File([vi.mocked(downloadFile).mock.calls[0][0]], 'backup.json');
     const raw = JSON.parse(await file.text());
-    expect(raw.v).toBe(2);
+    expect(raw.v).toBe(3);
     await restoreBackup(file, pin);
     expect((await listClasses(keys))[0].id).toBe(a.id);
     expect((await classStudents(keys, a.id))[0].name).toBe(student.name);
     const data = await decrypt<{ enrollments: Array<{ classId: string; studentToken: string }> }>(
       keys.encryption,
       raw.payload,
-      'backup:v2',
+      'backup:v3',
     );
     data.enrollments[0].classId = 'missing';
-    raw.payload = await encrypt(keys.encryption, data, 'backup:v2');
+    raw.payload = await encrypt(keys.encryption, data, 'backup:v3');
     await expect(restoreBackup(new File([JSON.stringify(raw)], 'bad.json'), pin)).rejects.toThrow(
       'enrollment',
     );

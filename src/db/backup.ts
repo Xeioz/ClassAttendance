@@ -1,34 +1,19 @@
 import { teacherOperation } from '../domain/operations';
 import { db } from './db';
-import { decrypt, deriveKeys, encrypt, ITERATIONS } from './crypto';
+import { decrypt, deriveKeys, encrypt } from './crypto';
 import { downloadFile } from '../utils/download';
-import type {
-  ClassRow,
-  ClassPrivate,
-  EnrollmentRow,
-  AttendancePrivate,
-  AttendanceRow,
-  Cipher,
-  EventRow,
-  SessionPrivate,
-  SessionRow,
-  StudentPrivate,
-  StudentRow,
-  VaultKeys,
-  VaultMeta,
-} from '../types';
+import {
+  validateBackupData,
+  validateBackupSize,
+  validateCipher,
+  validateVaultMeta,
+} from './backupValidation';
+import type { Cipher, VaultKeys, VaultMeta } from '../types';
 
-interface BackupData {
-  classes?: ClassRow[];
-  enrollments?: EnrollmentRow[];
-  students: StudentRow[];
-  sessions: SessionRow[];
-  attendance: AttendanceRow[];
-  scanEvents: EventRow[];
-}
 interface BackupFile {
   format: 'attendance-desk';
-  v: 1 | 2;
+  v: 3;
+  schema: 'class-attendance:unified-v3';
   meta: VaultMeta;
   payload: Cipher;
 }
@@ -36,273 +21,120 @@ interface BackupFile {
 async function exportBackupInternal(keys: VaultKeys): Promise<void> {
   const snapshot = await db.transaction(
     'r',
-    [db.meta, db.students, db.sessions, db.attendance, db.scanEvents, db.classes, db.enrollments],
+    [
+      db.meta,
+      db.students,
+      db.sessions,
+      db.attendance,
+      db.scanEvents,
+      db.classTemplates,
+      db.classes,
+      db.enrollments,
+      db.migrations,
+    ],
     async () => ({
       meta: await db.meta.get('vault'),
-      classes: await db.classes.toArray(),
-      enrollments: await db.enrollments.toArray(),
       students: await db.students.toArray(),
       sessions: await db.sessions.toArray(),
       attendance: await db.attendance.toArray(),
       scanEvents: await db.scanEvents.toArray(),
+      classTemplates: await db.classTemplates.toArray(),
+      classes: await db.classes.toArray(),
+      enrollments: await db.enrollments.toArray(),
+      migrations: await db.migrations.toArray(),
     }),
   );
   if (!snapshot.meta) throw new Error('No vault to back up.');
   if (snapshot.meta.salt !== keys.salt)
     throw new Error('The vault changed in another tab. Lock and unlock again.');
-  const { meta, ...data } = snapshot;
+  const meta = validateVaultMeta(snapshot.meta);
+  if ((await decrypt<unknown>(keys.encryption, meta.verifier, 'vault:v1')) !== 'attendance-desk')
+    throw new Error('Invalid backup key verifier.');
+  // Shared checks prevent offering files outside this application's recovery contract.
+  const { data } = await validateBackupData(snapshot, keys, 3);
   const file: BackupFile = {
     format: 'attendance-desk',
-    v: 2,
+    v: 3,
+    schema: 'class-attendance:unified-v3',
     meta,
-    payload: await encrypt(keys.encryption, data, 'backup:v2'),
+    payload: await encrypt(keys.encryption, data, 'backup:v3'),
   };
-  downloadFile(
-    new Blob([JSON.stringify(file)], { type: 'application/json' }),
-    `attendance_backup_${new Date().toISOString().slice(0, 10)}.enc.json`,
-  );
-}
-function isObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-function isCipher(value: unknown): value is Cipher {
-  return (
-    isObject(value) &&
-    value.v === 1 &&
-    typeof value.iv === 'string' &&
-    value.iv.length === 16 &&
-    typeof value.data === 'string'
-  );
-}
-function string(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && value.length < 512;
+  const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
+  validateBackupSize(blob.size);
+  downloadFile(blob, `attendance_backup_${new Date().toISOString().slice(0, 10)}.enc.json`);
 }
 
 async function restoreBackupInternal(
   file: File,
   pin: string,
 ): Promise<{ students: number; sessions: number; courses: number }> {
-  if (file.size > 25 * 1024 * 1024) throw new Error('Backup exceeds the 25 MB restore limit.');
-  const raw: unknown = JSON.parse(await file.text());
+  validateBackupSize(file.size);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(await file.text());
+  } catch {
+    throw new Error('Unsupported backup format: invalid JSON.');
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+    throw new Error('Unsupported backup format.');
+  const envelope = raw as Record<string, unknown>;
   if (
-    !isObject(raw) ||
-    raw.format !== 'attendance-desk' ||
-    (raw.v !== 1 && raw.v !== 2) ||
-    !isObject(raw.meta) ||
-    !isCipher(raw.payload)
+    envelope.format !== 'attendance-desk' ||
+    (envelope.v !== 1 && envelope.v !== 2 && envelope.v !== 3)
   )
     throw new Error('Unsupported backup format.');
-  const meta = raw.meta;
-  if (
-    meta.id !== 'vault' ||
-    meta.v !== 1 ||
-    meta.iterations !== ITERATIONS ||
-    typeof meta.salt !== 'string' ||
-    meta.salt.length !== 24 ||
-    !isCipher(meta.verifier)
-  )
-    throw new Error('Invalid backup key metadata.');
+  if (envelope.v === 3 && envelope.schema !== 'class-attendance:unified-v3')
+    throw new Error('Unsupported backup schema.');
+  const meta = validateVaultMeta(envelope.meta);
+  const payload = validateCipher(envelope.payload, 'payload');
   const keys = await deriveKeys(pin, meta.salt);
-  if ((await decrypt<string>(keys.encryption, meta.verifier, 'vault:v1')) !== 'attendance-desk')
+  if ((await decrypt<unknown>(keys.encryption, meta.verifier, 'vault:v1')) !== 'attendance-desk')
     throw new Error('Wrong backup PIN.');
-  const data = await decrypt<BackupData>(keys.encryption, raw.payload, `backup:v${raw.v}`);
-  for (const name of ['students', 'sessions', 'attendance', 'scanEvents'] as const)
-    if (!Array.isArray(data[name]) || data[name].length > 100000)
-      throw new Error('Invalid backup table.');
-  if (raw.v === 2 && (!Array.isArray(data.classes) || !Array.isArray(data.enrollments)))
-    throw new Error('Missing class data.');
-  data.classes ??= [];
-  data.enrollments ??= [];
-  if (data.classes.length > 100000 || data.enrollments.length > 100000)
-    throw new Error('Invalid class table.');
-  const classIds = new Set<string>();
-  const classMetadata = new Map<string, ClassPrivate>();
-  for (const row of data.classes) {
-    if (!isObject(row) || !string(row.id) || !isCipher(row.encrypted) || classIds.has(row.id))
-      throw new Error('Invalid class record.');
-    const value = await decrypt<ClassPrivate>(keys.encryption, row.encrypted, `class:${row.id}`);
-    if (
-      !string(value.course) ||
-      !string(value.section) ||
-      !string(value.term) ||
-      !Number.isInteger(value.graceMinutes) ||
-      value.graceMinutes < 0 ||
-      value.graceMinutes > 180 ||
-      ['subject', 'room', 'institution'].some(
-        (key) => typeof value[key as keyof ClassPrivate] !== 'string',
-      )
-    )
-      throw new Error('Invalid class metadata.');
-    if (value.timezone !== undefined) {
-      try {
-        new Intl.DateTimeFormat('en', { timeZone: value.timezone });
-      } catch {
-        throw new Error('Invalid class timezone.');
-      }
-    }
-    classIds.add(row.id);
-    classMetadata.set(row.id, value);
-  }
-  const studentTokens = new Set<string>();
-  const studentSections = new Map<string, string>();
-  const sessions = new Set<string>();
-  const courses = new Set<string>();
-  const sessionStudents = new Map<string, Set<string>>();
-  for (const row of data.students) {
-    if (
-      !isObject(row) ||
-      !string(row.token) ||
-      !string(row.sectionToken) ||
-      !isCipher(row.encrypted)
-    )
-      throw new Error('Invalid student record.');
-    if (studentTokens.has(row.token)) throw new Error('Duplicate student record.');
-    studentTokens.add(row.token);
-    const student = await decrypt<StudentPrivate>(
-      keys.encryption,
-      row.encrypted,
-      `student:${row.token}`,
-    );
-    if (!string(student.id) || !string(student.name) || !string(student.section))
-      throw new Error('Invalid student data.');
-    studentSections.set(row.token, student.section);
-  }
-  const enrollmentIds = new Set<string>();
-  for (const row of data.enrollments) {
-    if (!isObject(row) || !classIds.has(row.classId) || !studentTokens.has(row.studentToken))
-      throw new Error('Invalid enrollment.');
-    if (classMetadata.get(row.classId)?.section !== studentSections.get(row.studentToken))
-      throw new Error('Enrollment section mismatch.');
-    const key = JSON.stringify([row.classId, row.studentToken]);
-    if (enrollmentIds.has(key)) throw new Error('Duplicate enrollment.');
-    enrollmentIds.add(key);
-  }
-  for (const row of data.sessions) {
-    if (
-      !isObject(row) ||
-      !string(row.id) ||
-      !['ACTIVE', 'CLOSED'].includes(row.state) ||
-      !isCipher(row.encrypted)
-    )
-      throw new Error('Invalid session record.');
-    const session = await decrypt<SessionPrivate>(
-      keys.encryption,
-      row.encrypted,
-      `session:${row.id}`,
-    );
-    if (
-      !string(session.course) ||
-      !string(session.section) ||
-      !Array.isArray(session.roster) ||
-      !Number.isFinite(session.startsAt)
-    )
-      throw new Error('Invalid session data.');
-    if (
-      !/^\d{3,6}$/.test(session.roomPin) ||
-      !Number.isInteger(session.graceMinutes) ||
-      session.graceMinutes < 0 ||
-      session.graceMinutes > 180 ||
-      session.roster.length > 10000
-    )
-      throw new Error('Invalid session settings.');
-    const tokens = new Set<string>();
-    for (const student of session.roster) {
-      if (
-        !isObject(student) ||
-        !string(student.id) ||
-        !string(student.name) ||
-        !string(student.section) ||
-        !string(student.token) ||
-        tokens.has(student.token)
-      )
-        throw new Error('Invalid session roster snapshot.');
-      tokens.add(student.token);
-    }
-    if (session.timezone !== undefined) {
-      try {
-        new Intl.DateTimeFormat('en', { timeZone: session.timezone }).format(session.startsAt);
-      } catch {
-        throw new Error('Invalid session timezone.');
-      }
-    }
-    if (sessions.has(row.id) || (session.classId !== undefined && !classIds.has(session.classId)))
-      throw new Error('Invalid session class or duplicate session.');
-    if (session.classId) {
-      const offering = classMetadata.get(session.classId)!;
-      if (offering.course !== session.course || offering.section !== session.section)
-        throw new Error('Session class mismatch.');
-    }
-    sessionStudents.set(row.id, tokens);
-    sessions.add(row.id);
-    courses.add(session.course);
-  }
-  if (data.sessions.filter((row) => row.state === 'ACTIVE').length > 1)
-    throw new Error('Backup has conflicting active sessions.');
-  const attendanceKeys = new Set<string>();
-  for (const row of data.attendance) {
-    if (
-      !isObject(row) ||
-      !string(row.studentToken) ||
-      !sessions.has(row.sessionId) ||
-      !sessionStudents.get(row.sessionId)?.has(row.studentToken) ||
-      !isCipher(row.encrypted)
-    )
-      throw new Error('Invalid attendance record.');
-    const key = JSON.stringify([row.sessionId, row.studentToken]);
-    if (attendanceKeys.has(key)) throw new Error('Duplicate attendance record.');
-    attendanceKeys.add(key);
-    const entry = await decrypt<AttendancePrivate>(
-      keys.encryption,
-      row.encrypted,
-      `attendance:${row.sessionId}:${row.studentToken}`,
-    );
-    if (
-      !['PRESENT', 'LATE', 'ABSENT', 'EXCUSED'].includes(entry.status) ||
-      !Number.isFinite(entry.at) ||
-      !['QR', 'MANUAL', 'SYSTEM'].includes(entry.source) ||
-      (entry.originalAt !== undefined && !Number.isFinite(entry.originalAt))
-    )
-      throw new Error('Invalid attendance data.');
-  }
-  const eventIds = new Set<string>();
-  for (const row of data.scanEvents) {
-    if (
-      !isObject(row) ||
-      !string(row.id) ||
-      !sessions.has(row.sessionId) ||
-      !isCipher(row.encrypted)
-    )
-      throw new Error('Invalid event record.');
-    if (eventIds.has(row.id)) throw new Error('Duplicate event record.');
-    eventIds.add(row.id);
-    await decrypt(keys.encryption, row.encrypted, `event:${row.id}`);
-  }
-  // Validation and decryption finish before touching existing data. Any failure rolls back replacement.
+  const { data, courses } = await validateBackupData(
+    await decrypt<unknown>(keys.encryption, payload, `backup:v${envelope.v}`),
+    keys,
+    envelope.v,
+  );
+  // Validation finishes before touching existing data. Write failures roll back this
+  // atomic replacement transaction, including the original vault metadata.
   await db.transaction(
     'rw',
-    [db.meta, db.students, db.sessions, db.attendance, db.scanEvents, db.classes, db.enrollments],
+    [
+      db.meta,
+      db.students,
+      db.sessions,
+      db.attendance,
+      db.scanEvents,
+      db.classTemplates,
+      db.classes,
+      db.enrollments,
+      db.migrations,
+    ],
     async () => {
       await Promise.all([
-        db.classes.clear(),
-        db.enrollments.clear(),
         db.meta.clear(),
         db.students.clear(),
         db.sessions.clear(),
         db.attendance.clear(),
         db.scanEvents.clear(),
+        db.classTemplates.clear(),
+        db.classes.clear(),
+        db.enrollments.clear(),
+        db.migrations.clear(),
       ]);
-      await db.meta.add(meta as unknown as VaultMeta);
+      await db.meta.add(meta);
       await db.students.bulkAdd(data.students);
-      await db.classes.bulkAdd(data.classes!);
-      await db.enrollments.bulkAdd(data.enrollments!);
       await db.sessions.bulkAdd(data.sessions);
       await db.attendance.bulkAdd(data.attendance);
       await db.scanEvents.bulkAdd(data.scanEvents);
+      await db.classTemplates.bulkAdd(data.classTemplates);
+      await db.classes.bulkAdd(data.classes);
+      await db.enrollments.bulkAdd(data.enrollments);
+      await db.migrations.bulkAdd(data.migrations);
     },
   );
-  return { students: data.students.length, sessions: data.sessions.length, courses: courses.size };
+  return { students: data.students.length, sessions: data.sessions.length, courses };
 }
 
 export const exportBackup = teacherOperation(exportBackupInternal);
-
 export const restoreBackup = teacherOperation(restoreBackupInternal);
