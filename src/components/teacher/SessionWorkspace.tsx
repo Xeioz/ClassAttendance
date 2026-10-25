@@ -211,7 +211,7 @@ export function SessionWorkspace({
                 </p>
               </div>
               {(view === 'review' || session.state === 'CLOSED') && (
-                <ExportModal keys={keys} sessionId={session.id} />
+                <ExportModal keys={keys} session={session} auditCount={events.length} />
               )}
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-3">
