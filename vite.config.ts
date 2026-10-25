@@ -4,8 +4,28 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: process.env.BASE_PATH || '/',
+  build: { manifest: true },
   plugins: [
     react(),
+    {
+      name: 'production-security-policy',
+      apply: 'build',
+      transformIndexHtml: {
+        order: 'pre',
+        handler: () => [
+          {
+            tag: 'meta',
+            attrs: {
+              'http-equiv': 'Content-Security-Policy',
+              content:
+                "default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self'; form-action 'none'; frame-src 'none'",
+            },
+            injectTo: 'head-prepend',
+          },
+        ],
+      },
+    },
+
     {
       name: 'offline-checklist',
       generateBundle(_options, bundle) {
