@@ -1,12 +1,11 @@
 # Student guide
 
-1. Open the teacher-provided HTTPS website while you have internet, preferably before class. No mobile app or installation is required.
-2. Check offline readiness. Try reopening the same browser URL without a connection before relying on it in a dead zone.
-3. Select Student pass, enter your official student ID, and enter the current room challenge shown by the teacher.
-4. Remembering your ID is optional. On shared devices, leave it off and use Forget saved ID when finished.
-5. Display the QR and show your screen to the teacher. Increase brightness manually if glare or a dim display prevents reading.
-6. Wait for the teacher to confirm attendance was saved. A displayed QR, countdown or wake-lock message does not prove attendance was recorded.
+Choose **I am a Student** on the website. The student page is available directly at the same website address followed by `#/student`.
 
-If your battery is dead, the browser was never cached, or the screen is unreadable, ask for manual attendance. If your ID is already recorded unexpectedly, ask the teacher to review the duplicate and verify your identity. Do not borrow another student's ID or forward passes.
+1. While connected, choose **Prepare for offline use**. Wait for the active website resources to be verified, then bookmark the exact student link shown. You can prepare before knowing the room challenge.
+2. Test reopening that saved link with connectivity disabled. It should open the student form directly. First access or recovery of deleted resources still requires internet. A home-screen icon may launch the role page; a bookmark alone does not cache resources.
+3. Enter your official student ID and the current room challenge announced by your teacher. Optional ID memory saves only the ID in this browser; use **Forget saved ID** on shared devices. Challenges are not remembered.
+4. Display your QR pass. Keep the screen visible and wait for the teacher to confirm attendance was saved. Generating a pass does not record attendance by itself.
+5. Use **Edit ID or challenge** when needed. If the website/camera cannot work, ask the teacher for manual attendance.
 
-If the pass expires or the room challenge changes, edit the challenge or refresh the pass. If the clock warning remains, ask for manual check-in rather than changing the device clock during class.
+Preparing offline resources does not guarantee permanent browser retention. Keep the same browser and website origin, and do not clear its data before class. Wake lock and vibration depend on browser support; wake lock does not control screen brightness. Resize or rotate normally; the pass remains the same task.

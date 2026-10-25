@@ -1,9 +1,16 @@
+import { requestPersistence } from '../../db/db';
 import { useState, type FormEvent } from 'react';
 import { exportBackup, restoreBackup } from '../../db/backup';
 import { errorMessage } from '../../utils/errors';
 import type { VaultKeys } from '../../types';
 
-export function BackupControls({ keys }: { keys?: VaultKeys }) {
+export function BackupControls({
+  keys,
+  onRestored,
+}: {
+  keys?: VaultKeys;
+  onRestored?: () => void;
+}) {
   const [file, setFile] = useState<File>();
   const [pin, setPin] = useState('');
   const [confirm, setConfirm] = useState(false);
@@ -30,6 +37,8 @@ export function BackupControls({ keys }: { keys?: VaultKeys }) {
     try {
       const restored = await restoreBackup(file, pin);
       setPin('');
+      setConfirm(false);
+      onRestored?.();
       setMessage(
         `Restored ${restored.courses} courses, ${restored.students} roster entries, and ${restored.sessions} attendance sessions. Unlock with the backup PIN.`,
       );
@@ -46,6 +55,15 @@ export function BackupControls({ keys }: { keys?: VaultKeys }) {
         Browser data is the local working copy. Clearing site data or losing this device can destroy
         it. A forgotten PIN cannot be reset to decrypt old records.
       </p>
+      {keys && (
+        <button
+          className="secondary mb-4"
+          disabled={busy}
+          onClick={() => void requestPersistence().then(setMessage)}
+        >
+          Check storage persistence
+        </button>
+      )}
       {keys ? (
         <button className="secondary" disabled={busy} onClick={() => void backup()}>
           {busy ? 'Preparing…' : 'Download encrypted backup'}

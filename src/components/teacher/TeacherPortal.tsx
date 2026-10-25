@@ -1,3 +1,4 @@
+import { isTeacherBusy, useTeacherBusy } from '../../domain/operations';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { db, requestPersistence } from '../../db/db';
 import { unlockVault } from '../../db/vault';
@@ -7,6 +8,9 @@ import { BackupControls } from './BackupControls';
 import { TeacherWorkspace } from './TeacherWorkspace';
 
 export function TeacherPortal({ onActive }: { onActive: (active: boolean) => void }) {
+  const operationBusy = useTeacherBusy();
+  const [lockRequested, setLockRequested] = useState(false);
+  const [revision, setRevision] = useState(0);
   const [keys, setKeys] = useState<VaultKeys>();
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -19,11 +23,19 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
       .get('vault')
       .then((value) => setExists(Boolean(value)))
       .catch((error) => setError(errorMessage(error)));
-  }, [keys]);
+  }, [keys, revision]);
   const lock = useCallback(() => {
+    if (isTeacherBusy()) {
+      setLockRequested(true);
+      return;
+    }
+    setLockRequested(false);
     setKeys(undefined);
     onActive(false);
   }, [onActive]);
+  useEffect(() => {
+    if (lockRequested && !operationBusy) lock();
+  }, [lockRequested, operationBusy, lock]);
   useEffect(() => {
     if (!keys) return;
     let timer: number;
@@ -66,12 +78,11 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{persistence}</p>
-        <button className="secondary" onClick={lock}>
+        <button className="secondary" disabled={operationBusy} onClick={lock}>
           Lock teacher records
         </button>
       </div>
       <TeacherWorkspace keys={keys} onActive={onActive} />
-      <BackupControls keys={keys} />
     </>
   ) : (
     <div className="mx-auto grid max-w-xl gap-5">
@@ -79,7 +90,11 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
         <div>
           <p className="eyebrow">Teacher workspace</p>
           <h2 className="mt-2 text-2xl">
-            {exists === false ? 'Protect your local records' : 'Unlock local records'}
+            {exists === undefined
+              ? 'Checking local workspace…'
+              : exists === false
+                ? 'Create your teacher PIN'
+                : 'Unlock teacher portal'}
           </h2>
           <p className="mt-3 text-sm text-slate-600">
             Records stay in this browser. Your Master PIN is never sent to a server.
@@ -120,13 +135,33 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
         <button className="btn" disabled={busy || exists === undefined}>
           {busy ? 'Unlocking…' : exists ? 'Unlock teacher workspace' : 'Create encrypted workspace'}
         </button>
+        {error && exists === undefined ? (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              setError('');
+              setRevision((value) => value + 1);
+            }}
+          >
+            Retry storage check
+          </button>
+        ) : null}
         {error ? (
           <p role="alert" className="notice">
             {error}
           </p>
         ) : null}
       </form>
-      <BackupControls />
+      <BackupControls
+        onRestored={() => {
+          setPin('');
+          setConfirmation('');
+          setError('');
+          setExists(undefined);
+          setRevision((value) => value + 1);
+        }}
+      />
     </div>
   );
 }

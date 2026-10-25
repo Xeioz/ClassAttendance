@@ -1,24 +1,28 @@
 import { useState, type FormEvent } from 'react';
 import { createSession } from '../../domain/attendance';
 import { errorMessage } from '../../utils/errors';
-import type { Session, VaultKeys } from '../../types';
+import type { ClassOffering, Session, VaultKeys } from '../../types';
 
 export function SessionForm({
   keys,
   sections,
   onCreated,
+  offering,
 }: {
   keys: VaultKeys;
+  offering?: ClassOffering;
   sections: string[];
   onCreated: (session: Session) => Promise<void>;
 }) {
-  const [course, setCourse] = useState('');
-  const [institution, setInstitution] = useState('');
-  const [subject, setSubject] = useState('');
-  const [room, setRoom] = useState('');
-  const [section, setSection] = useState('');
-  const [pin, setPin] = useState('');
-  const [grace, setGrace] = useState(15);
+  const [course, setCourse] = useState(offering?.course ?? '');
+  const [institution, setInstitution] = useState(offering?.institution ?? '');
+  const [subject, setSubject] = useState(offering?.subject ?? '');
+  const [room, setRoom] = useState(offering?.room ?? '');
+  const [section, setSection] = useState(offering?.section ?? '');
+  const [pin, setPin] = useState(() =>
+    String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)),
+  );
+  const [grace, setGrace] = useState(offering?.graceMinutes ?? 15);
   const [start, setStart] = useState(() => {
     const now = new Date();
     return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -31,6 +35,8 @@ export function SessionForm({
     setError('');
     try {
       const session = await createSession(keys, {
+        classId: offering?.id,
+        timezone: offering?.timezone,
         institution: institution.trim(),
         subject: subject.trim(),
         room: room.trim(),
@@ -77,6 +83,7 @@ export function SessionForm({
         <label>
           Course
           <input
+            readOnly={Boolean(offering)}
             value={course}
             onChange={(event) => setCourse(event.target.value)}
             placeholder="IT 101"
@@ -87,6 +94,7 @@ export function SessionForm({
         <label>
           Section
           <select
+            disabled={Boolean(offering)}
             value={section || sections[0] || ''}
             onChange={(event) => setSection(event.target.value)}
             required
@@ -132,9 +140,19 @@ export function SessionForm({
           />
         </label>
       </div>
+      <button
+        type="button"
+        className="secondary justify-self-start"
+        onClick={() =>
+          setPin(String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)))
+        }
+      >
+        Generate another challenge
+      </button>
       <p className="text-sm text-slate-600">
-        Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Late means saved after start +
-        grace. Use a reasoned correction for students already waiting at the cutoff.
+        Report timezone: {offering?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}.
+        Late means saved after start + grace. Use a reasoned correction for students already waiting
+        at the cutoff.
       </p>
       <button className="btn justify-self-start" disabled={busy || !sections.length}>
         {busy ? 'Creating…' : 'Create attendance session'}

@@ -14,7 +14,7 @@ export async function exportExcel(
     'Official name',
     'Section',
     'Status',
-    'First recorded (UTC)',
+    'Recorded / corrected (UTC)',
     'Last changed (UTC)',
     'Source',
     'Reason',

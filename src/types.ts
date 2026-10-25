@@ -18,6 +18,7 @@ export interface Student extends StudentPrivate {
   token: string;
 }
 export interface SessionPrivate {
+  classId?: string;
   course: string;
   section: string;
   roomPin: string;
@@ -29,6 +30,27 @@ export interface SessionPrivate {
   room?: string;
   timezone?: string;
   closedAt?: number;
+}
+export interface ClassPrivate {
+  timezone?: string;
+  course: string;
+  section: string;
+  term: string;
+  subject: string;
+  institution: string;
+  room: string;
+  graceMinutes: number;
+}
+export interface ClassRow {
+  id: string;
+  encrypted: Cipher;
+}
+export interface ClassOffering extends ClassPrivate {
+  id: string;
+}
+export interface EnrollmentRow {
+  classId: string;
+  studentToken: string;
 }
 export interface SessionRow {
   id: string;
@@ -46,6 +68,7 @@ export interface AttendancePrivate {
   source: 'QR' | 'MANUAL' | 'SYSTEM';
   reason?: string;
   originalAt?: number;
+  absenceOrigin?: 'CLOSURE' | 'TEACHER';
 }
 export interface AttendanceRow {
   sessionId: string;

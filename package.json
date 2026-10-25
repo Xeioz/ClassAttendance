@@ -1,7 +1,7 @@
 {
   "name": "portable-qr-attendance",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -18,7 +18,9 @@
     "qrcode": "1.5.4",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "workbox-precaching": "7.4.1",
+    "workbox-routing": "7.4.1"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.0",

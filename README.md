@@ -32,14 +32,19 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 
 ## First classroom workflow
 
-1. Open Teacher workspace and create a Master PIN. Use a long random PIN and record it securely. No reset can decrypt forgotten-PIN records.
-2. Import a CSV with `id,name,section` headers. A synthetic sample is available at `public/sample-roster.csv`. Preview names, encoding, normalized IDs, and sections before merging.
-3. Create a session for an imported section, choose start time/grace, and announce the 3–6 digit room challenge. Device timezone is explicitly displayed.
-4. Students open Student pass, enter their ID and challenge, and display a QR. Optional ID memory is confined to their browser.
-5. Verify student identity, start the teacher camera, and scan. Choose compatibility decoder if native decoding fails. Manual check-in remains available.
-6. Review saved records and disputes. Use F2 for manual attendance or reasoned corrections. Resolve disputes before closure. Closed sessions are read-only; reopen with a reason before changes.
-7. Download an Excel/CSV report and an encrypted backup. Excel includes a separate audit worksheet. Check the browser actually saved each file. Keep the backup outside the recording device.
-8. To restore, lock teacher records, choose the backup and its PIN, acknowledge replacement, and restore. Existing data is replaced only after validation, inside a database transaction.
+1. Choose **I am a Teacher** and create a Master PIN, or unlock the existing workspace. Keep the PIN securely; it cannot be reset to decrypt old records.
+2. Choose **Add class**, enter course, section and term, then import `id,name,section` CSV into that class. Preview additions, matches, name conflicts and section mismatches. Imports add enrollment; omitted students stay enrolled. Try `public/master-list-20-students.csv` with a BSIT-3A class.
+3. Open the class Overview and choose **Start attendance**. Review the device-local start time, report timezone, grace period and generated room challenge. Only one session can be active.
+4. Students choose **I am a Student**, prepare offline resources and bookmark the exact `#/student` URL. They enter ID and the current challenge to display a QR. A root-launching home-screen icon may still show role selection.
+5. Verify identity, start the teacher camera and scan. Manual attendance (F2), sound, torch and compatibility decoding remain available. Success feedback follows a committed save.
+6. Choose **Review attendance** to pause the camera, review unrecorded students and resolve disputes. Confirm closure to fill automatic absences. Closed results are read-only; reopening requires a reason.
+7. Download Excel/CSV and use **Backup & storage** for an encrypted backup. Check the browser saved the files and keep the backup outside the recording device.
+8. To restore, lock records and select the archive with its original PIN. Confirm full replacement. Version 2 archives include classes/enrollment; version 1 archives restore original records for explicit class review.
+9. Existing sessions appear under **Unassigned records**. Create the matching course/section/term, then associate each session. This preserves its IDs, attendance, audit and snapshot. Existing section students are copied into a class only after explicit roster review.
+
+Desktop uses class navigation beside the selected workspace. Narrow screens use full-width class and task views with **Back to classes**. Resizing does not mount a second scanner. Defaults apply only to future sessions.
+
+See [prototypev2 implementation and validation](docs/prototypev2-release.md) for migration, recovery and remaining device checks.
 
 ## Implementation map
 
@@ -52,15 +57,16 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 | D: sessions and transactions | `src/domain/attendance.ts`, `checkIn.ts`, `sessionLifecycle.ts`, `qr.ts` |
 | D: reports | `src/domain/reports.ts`, `src/utils/excel.ts`, `csvExport.ts` |
 | Disputes and audit | `src/domain/audit.ts`, `src/components/teacher/DisputePanel.tsx`, `AuditTrail.tsx` |
-| Teacher orchestration | `src/components/teacher/TeacherPortal.tsx`, `TeacherWorkspace.tsx`, `ManualEntryDialog.tsx` |
-| Offline caching | `vite.config.ts`, `src/components/common/OfflineStatus.tsx` |
+| Teacher orchestration | `src/components/teacher/TeacherPortal.tsx`, `TeacherWorkspace.tsx`, `SessionWorkspace.tsx`, `ClassForm.tsx`, `ManualEntryDialog.tsx` |
+| Classes and safe operations | `src/domain/classes.ts`, `operations.ts`, `src/hooks/route.ts` |
+| Offline caching | `src/sw.ts`, `vite.config.ts`, `src/components/common/OfflineStatus.tsx` |
 
 Files use `.ts`/`.tsx` instead of `.js`/`.jsx` to enforce strict TypeScript. `ExportModal` is an inline export control rather than a focus-trapping dialog; session rules are in the domain layer, not inside the export component.
 
 ## Security contract
 
 - Implements the specifically requested PBKDF2-HMAC-SHA256, 100,000 iterations, with a random 128-bit salt. Derives separate non-extractable AES-GCM-256 and HMAC-SHA256 keys. PINs accept 6–12 digits.
-- Every encryption gets a fresh 96-bit IV. Additional authenticated data binds ciphertext to its record identity. Names, IDs, section membership, session details, attendance values, notes, events, and the backup payload are encrypted.
+- Every encryption gets a fresh 96-bit IV. Additional authenticated data binds ciphertext to its record identity. Names, IDs, class metadata, session details, attendance values, notes, events, and the backup payload are encrypted. Opaque class/enrollment links are plaintext relational metadata.
 - Plaintext metadata consists of record IDs, vault KDF parameters, active/closed session state, and opaque HMAC indexes; record counts, relationships, and same-identity equality remain observable. This is not traffic-analysis-proof storage.
 - Six-digit PINs remain vulnerable to offline guessing. These requested settings are a compatibility baseline, not a claim of strong resistance against a stolen database. A passphrase/key-wrapping design is a future hardening change requiring migration.
 - Keys remain in memory only. Teacher views lock after 15 minutes without pointer/keyboard interaction or when leaving the page. Camera capture alone does not extend that interval. JavaScript cannot promise forensic memory wiping.
@@ -73,7 +79,7 @@ Files use `.ts`/`.tsx` instead of `.js`/`.jsx` to enforce strict TypeScript. `Ex
 ## Offline and browser contract
 
 - All built JS/CSS and lazy decoder/export chunks are precached; no classroom runtime CDN requests are needed. The SheetJS official tarball is an install-time dependency, not a runtime CDN script.
-- Click Check offline readiness, then perform an actual cold offline launch. A readiness result checks cached resource existence, not a permanent guarantee against browser deletion or corruption.
+- Click Check offline readiness, then perform an actual cold offline launch. A readiness result asks the controlling service worker to check its own revision-specific precache, not a permanent guarantee against browser deletion or corruption.
 - `navigator.storage.persist()` can be unavailable or denied. Browser storage is finite; clearing website data or losing the device can lose records. Keep backups.
 - Writes and audit attempts commit transactionally before success feedback. A compound database primary key prevents duplicate attendance even with concurrent scans. A 1.5-second cooldown and continuous-target gate suppress held passes until the target clears; neither is an attendance integrity control.
 - The local database is authoritative; there is no server sync. Use one teacher device per class. Multiple tabs cannot create duplicate attendance records or competing active sessions, but interfaces refresh on focus rather than providing collaborative live synchronization.

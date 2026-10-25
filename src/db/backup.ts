@@ -1,7 +1,11 @@
+import { teacherOperation } from '../domain/operations';
 import { db } from './db';
 import { decrypt, deriveKeys, encrypt, ITERATIONS } from './crypto';
 import { downloadFile } from '../utils/download';
 import type {
+  ClassRow,
+  ClassPrivate,
+  EnrollmentRow,
   AttendancePrivate,
   AttendanceRow,
   Cipher,
@@ -15,6 +19,8 @@ import type {
 } from '../types';
 
 interface BackupData {
+  classes?: ClassRow[];
+  enrollments?: EnrollmentRow[];
   students: StudentRow[];
   sessions: SessionRow[];
   attendance: AttendanceRow[];
@@ -22,17 +28,19 @@ interface BackupData {
 }
 interface BackupFile {
   format: 'attendance-desk';
-  v: 1;
+  v: 1 | 2;
   meta: VaultMeta;
   payload: Cipher;
 }
 
-export async function exportBackup(keys: VaultKeys): Promise<void> {
+async function exportBackupInternal(keys: VaultKeys): Promise<void> {
   const snapshot = await db.transaction(
     'r',
-    [db.meta, db.students, db.sessions, db.attendance, db.scanEvents],
+    [db.meta, db.students, db.sessions, db.attendance, db.scanEvents, db.classes, db.enrollments],
     async () => ({
       meta: await db.meta.get('vault'),
+      classes: await db.classes.toArray(),
+      enrollments: await db.enrollments.toArray(),
       students: await db.students.toArray(),
       sessions: await db.sessions.toArray(),
       attendance: await db.attendance.toArray(),
@@ -45,9 +53,9 @@ export async function exportBackup(keys: VaultKeys): Promise<void> {
   const { meta, ...data } = snapshot;
   const file: BackupFile = {
     format: 'attendance-desk',
-    v: 1,
+    v: 2,
     meta,
-    payload: await encrypt(keys.encryption, data, 'backup:v1'),
+    payload: await encrypt(keys.encryption, data, 'backup:v2'),
   };
   downloadFile(
     new Blob([JSON.stringify(file)], { type: 'application/json' }),
@@ -70,7 +78,7 @@ function string(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length < 512;
 }
 
-export async function restoreBackup(
+async function restoreBackupInternal(
   file: File,
   pin: string,
 ): Promise<{ students: number; sessions: number; courses: number }> {
@@ -79,7 +87,7 @@ export async function restoreBackup(
   if (
     !isObject(raw) ||
     raw.format !== 'attendance-desk' ||
-    raw.v !== 1 ||
+    (raw.v !== 1 && raw.v !== 2) ||
     !isObject(raw.meta) ||
     !isCipher(raw.payload)
   )
@@ -97,10 +105,46 @@ export async function restoreBackup(
   const keys = await deriveKeys(pin, meta.salt);
   if ((await decrypt<string>(keys.encryption, meta.verifier, 'vault:v1')) !== 'attendance-desk')
     throw new Error('Wrong backup PIN.');
-  const data = await decrypt<BackupData>(keys.encryption, raw.payload, 'backup:v1');
+  const data = await decrypt<BackupData>(keys.encryption, raw.payload, `backup:v${raw.v}`);
   for (const name of ['students', 'sessions', 'attendance', 'scanEvents'] as const)
     if (!Array.isArray(data[name]) || data[name].length > 100000)
       throw new Error('Invalid backup table.');
+  if (raw.v === 2 && (!Array.isArray(data.classes) || !Array.isArray(data.enrollments)))
+    throw new Error('Missing class data.');
+  data.classes ??= [];
+  data.enrollments ??= [];
+  if (data.classes.length > 100000 || data.enrollments.length > 100000)
+    throw new Error('Invalid class table.');
+  const classIds = new Set<string>();
+  const classMetadata = new Map<string, ClassPrivate>();
+  for (const row of data.classes) {
+    if (!isObject(row) || !string(row.id) || !isCipher(row.encrypted) || classIds.has(row.id))
+      throw new Error('Invalid class record.');
+    const value = await decrypt<ClassPrivate>(keys.encryption, row.encrypted, `class:${row.id}`);
+    if (
+      !string(value.course) ||
+      !string(value.section) ||
+      !string(value.term) ||
+      !Number.isInteger(value.graceMinutes) ||
+      value.graceMinutes < 0 ||
+      value.graceMinutes > 180 ||
+      ['subject', 'room', 'institution'].some(
+        (key) => typeof value[key as keyof ClassPrivate] !== 'string',
+      )
+    )
+      throw new Error('Invalid class metadata.');
+    if (value.timezone !== undefined) {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: value.timezone });
+      } catch {
+        throw new Error('Invalid class timezone.');
+      }
+    }
+    classIds.add(row.id);
+    classMetadata.set(row.id, value);
+  }
+  const studentTokens = new Set<string>();
+  const studentSections = new Map<string, string>();
   const sessions = new Set<string>();
   const courses = new Set<string>();
   const sessionStudents = new Map<string, Set<string>>();
@@ -112,6 +156,8 @@ export async function restoreBackup(
       !isCipher(row.encrypted)
     )
       throw new Error('Invalid student record.');
+    if (studentTokens.has(row.token)) throw new Error('Duplicate student record.');
+    studentTokens.add(row.token);
     const student = await decrypt<StudentPrivate>(
       keys.encryption,
       row.encrypted,
@@ -119,6 +165,17 @@ export async function restoreBackup(
     );
     if (!string(student.id) || !string(student.name) || !string(student.section))
       throw new Error('Invalid student data.');
+    studentSections.set(row.token, student.section);
+  }
+  const enrollmentIds = new Set<string>();
+  for (const row of data.enrollments) {
+    if (!isObject(row) || !classIds.has(row.classId) || !studentTokens.has(row.studentToken))
+      throw new Error('Invalid enrollment.');
+    if (classMetadata.get(row.classId)?.section !== studentSections.get(row.studentToken))
+      throw new Error('Enrollment section mismatch.');
+    const key = JSON.stringify([row.classId, row.studentToken]);
+    if (enrollmentIds.has(key)) throw new Error('Duplicate enrollment.');
+    enrollmentIds.add(key);
   }
   for (const row of data.sessions) {
     if (
@@ -168,12 +225,20 @@ export async function restoreBackup(
         throw new Error('Invalid session timezone.');
       }
     }
+    if (sessions.has(row.id) || (session.classId !== undefined && !classIds.has(session.classId)))
+      throw new Error('Invalid session class or duplicate session.');
+    if (session.classId) {
+      const offering = classMetadata.get(session.classId)!;
+      if (offering.course !== session.course || offering.section !== session.section)
+        throw new Error('Session class mismatch.');
+    }
     sessionStudents.set(row.id, tokens);
     sessions.add(row.id);
     courses.add(session.course);
   }
   if (data.sessions.filter((row) => row.state === 'ACTIVE').length > 1)
     throw new Error('Backup has conflicting active sessions.');
+  const attendanceKeys = new Set<string>();
   for (const row of data.attendance) {
     if (
       !isObject(row) ||
@@ -183,6 +248,9 @@ export async function restoreBackup(
       !isCipher(row.encrypted)
     )
       throw new Error('Invalid attendance record.');
+    const key = JSON.stringify([row.sessionId, row.studentToken]);
+    if (attendanceKeys.has(key)) throw new Error('Duplicate attendance record.');
+    attendanceKeys.add(key);
     const entry = await decrypt<AttendancePrivate>(
       keys.encryption,
       row.encrypted,
@@ -196,6 +264,7 @@ export async function restoreBackup(
     )
       throw new Error('Invalid attendance data.');
   }
+  const eventIds = new Set<string>();
   for (const row of data.scanEvents) {
     if (
       !isObject(row) ||
@@ -204,14 +273,18 @@ export async function restoreBackup(
       !isCipher(row.encrypted)
     )
       throw new Error('Invalid event record.');
+    if (eventIds.has(row.id)) throw new Error('Duplicate event record.');
+    eventIds.add(row.id);
     await decrypt(keys.encryption, row.encrypted, `event:${row.id}`);
   }
   // Validation and decryption finish before touching existing data. Any failure rolls back replacement.
   await db.transaction(
     'rw',
-    [db.meta, db.students, db.sessions, db.attendance, db.scanEvents],
+    [db.meta, db.students, db.sessions, db.attendance, db.scanEvents, db.classes, db.enrollments],
     async () => {
       await Promise.all([
+        db.classes.clear(),
+        db.enrollments.clear(),
         db.meta.clear(),
         db.students.clear(),
         db.sessions.clear(),
@@ -220,6 +293,8 @@ export async function restoreBackup(
       ]);
       await db.meta.add(meta as unknown as VaultMeta);
       await db.students.bulkAdd(data.students);
+      await db.classes.bulkAdd(data.classes!);
+      await db.enrollments.bulkAdd(data.enrollments!);
       await db.sessions.bulkAdd(data.sessions);
       await db.attendance.bulkAdd(data.attendance);
       await db.scanEvents.bulkAdd(data.scanEvents);
@@ -227,3 +302,7 @@ export async function restoreBackup(
   );
   return { students: data.students.length, sessions: data.sessions.length, courses: courses.size };
 }
+
+export const exportBackup = teacherOperation(exportBackupInternal);
+
+export const restoreBackup = teacherOperation(restoreBackupInternal);

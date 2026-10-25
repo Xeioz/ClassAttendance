@@ -12,6 +12,15 @@
   h3 {
     @apply font-semibold tracking-tight;
   }
+  h1,
+  h2,
+  h3,
+  p,
+  li,
+  button,
+  td {
+    overflow-wrap: anywhere;
+  }
   button,
   input,
   select,

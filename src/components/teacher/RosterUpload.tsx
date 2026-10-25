@@ -1,6 +1,7 @@
+import { classStudents, listClasses } from '../../domain/classes';
 import { useState, type DragEvent } from 'react';
 import { readRoster, type CSVEncoding } from '../../utils/csv';
-import { saveRoster } from '../../domain/attendance';
+import { listStudents, saveRoster } from '../../domain/attendance';
 import { errorMessage } from '../../utils/errors';
 import type { StudentPrivate, VaultKeys } from '../../types';
 
@@ -8,8 +9,10 @@ export function RosterUpload({
   keys,
   onSaved,
   disabled,
+  classId,
 }: {
   keys: VaultKeys;
+  classId?: string;
   onSaved: () => Promise<void>;
   disabled: boolean;
 }) {
@@ -17,15 +20,34 @@ export function RosterUpload({
   const [preview, setPreview] = useState<StudentPrivate[]>([]);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [conflicts, setConflicts] = useState<string[]>([]);
   async function load(file?: File) {
     if (!file || busy || disabled) return;
     setBusy(true);
     setPreview([]);
+    setConflicts([]);
     try {
       const result = await readRoster(file, encoding);
+      const existing = await listStudents(keys);
+      const current = classId ? await classStudents(keys, classId) : existing;
+      const offering = classId
+        ? (await listClasses(keys)).find((item) => item.id === classId)
+        : undefined;
+      const issues: string[] = [];
+      let additions = 0;
+      for (const row of result.rows) {
+        const prior = existing.find((item) => item.id === row.id && item.section === row.section);
+        if (prior && prior.name !== row.name.trim())
+          issues.push(`${row.id}: existing name is ${prior.name}; file contains ${row.name}.`);
+        if (classId && (!offering || row.section !== offering.section))
+          issues.push(`${row.id}: section ${row.section} does not match the selected class.`);
+        if (!current.some((item) => item.id === row.id && item.section === row.section))
+          additions++;
+      }
+      setConflicts(issues);
       setPreview(result.rows);
       setMessage(
-        `${result.rows.length} students · ${result.encoding}. Check names and IDs before saving.`,
+        `${result.rows.length} students · ${result.encoding} · ${additions} additions, ${result.rows.length - additions} existing matches, ${issues.length} conflicts. Omitted enrollment stays unchanged.`,
       );
     } catch (error) {
       setMessage(errorMessage(error));
@@ -36,9 +58,11 @@ export function RosterUpload({
   async function save() {
     setBusy(true);
     try {
-      await saveRoster(keys, preview);
+      await saveRoster(keys, preview, classId);
       setPreview([]);
-      setMessage('Roster saved encrypted. Existing IDs in the same section were updated.');
+      setMessage(
+        'Enrollment saved encrypted. Matching identities were retained; students omitted from this file remain enrolled.',
+      );
       await onSaved();
     } catch (error) {
       setMessage(errorMessage(error));
@@ -54,8 +78,8 @@ export function RosterUpload({
     <section className="card" onDragOver={(event) => event.preventDefault()} onDrop={drop}>
       <h2 className="text-xl">Class roster</h2>
       <p className="mb-4 mt-2 text-sm text-slate-600">
-        CSV columns: id, name, section. Import merges by section and ID. Close active sessions
-        first.
+        CSV columns: id, name, section. Import adds enrollment to this class. Existing names must
+        match; omitted students are retained. Close active sessions first.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <label>
@@ -88,6 +112,18 @@ export function RosterUpload({
           {message}
         </p>
       ) : null}
+      {conflicts.length > 0 && (
+        <div role="alert" className="notice mt-4">
+          <p className="font-semibold">Resolve these conflicts in your CSV before saving.</p>
+          <ul className="mt-2 max-h-48 overflow-auto">
+            {conflicts.map((issue, index) => (
+              <li key={index} className="py-1">
+                {issue}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {preview.length ? (
         <>
           <div className="mt-4 max-h-64 overflow-auto">
@@ -111,7 +147,11 @@ export function RosterUpload({
               </tbody>
             </table>
           </div>
-          <button className="btn mt-4" disabled={busy || disabled} onClick={() => void save()}>
+          <button
+            className="btn mt-4"
+            disabled={busy || disabled || conflicts.length > 0}
+            onClick={() => void save()}
+          >
             {busy ? 'Saving…' : `Encrypt and merge ${preview.length} students`}
           </button>
         </>

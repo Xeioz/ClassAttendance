@@ -18,7 +18,7 @@ export function attendanceCSV(
         'Official name': student.name,
         Section: student.section,
         Status: entry?.status ?? 'NOT_YET_RECORDED',
-        'First recorded (UTC)': recordedTime(entry),
+        'Recorded / corrected (UTC)': recordedTime(entry),
         'Last changed (UTC)': entry ? new Date(entry.at).toISOString() : '',
         Source: entry?.source ?? '',
         Reason: entry?.reason ?? '',

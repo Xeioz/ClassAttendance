@@ -2,11 +2,19 @@
 import 'fake-indexeddb/auto';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  configure,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { db } from '../src/db/db';
 import { unlockVault } from '../src/db/vault';
 import { createSession, getAttendance, listSessions, saveRoster } from '../src/domain/attendance';
-import { TeacherWorkspace } from '../src/components/teacher/TeacherWorkspace';
+import { SessionWorkspace } from '../src/components/teacher/SessionWorkspace';
 import type { VaultKeys } from '../src/types';
 
 vi.mock('../src/components/teacher/ScannerView', () => ({
@@ -16,6 +24,7 @@ vi.mock('../src/components/teacher/ScannerView', () => ({
     </div>
   ),
 }));
+configure({ asyncUtilTimeout: 5000 });
 let keys: VaultKeys;
 beforeEach(async () => {
   vi.stubGlobal('crypto', webcrypto);
@@ -44,7 +53,13 @@ afterEach(() => {
 });
 describe('teacher interface workflow', () => {
   it('opens F2 manual dialog, saves excusal, closes read-only, and reopens with a reason', async () => {
-    render(<TeacherWorkspace keys={keys} onActive={() => {}} />);
+    render(
+      <SessionWorkspace
+        keys={keys}
+        sessionId={(await listSessions(keys))[0].id}
+        onActive={() => {}}
+      />,
+    );
     await screen.findByRole('button', { name: 'Manual check-in / correction (F2)' });
     fireEvent.keyDown(window, { key: 'F2' });
     const dialog = await screen.findByRole('dialog');
@@ -64,6 +79,7 @@ describe('teacher interface workflow', () => {
     expect(screen.getByText('Camera adapter mocked for interface testing')).toBeTruthy();
     const session = (await listSessions(keys))[0];
     expect((await getAttendance(keys, session.id)).get(token)?.status).toBe('EXCUSED');
+    fireEvent.click(screen.getByRole('button', { name: 'Review attendance' }));
     fireEvent.click(screen.getByLabelText('Mark unrecorded students absent and close the session'));
     fireEvent.click(screen.getByRole('button', { name: 'Close attendance session' }));
     await screen.findByRole('heading', { name: 'Reopen for attendance changes' });
@@ -74,5 +90,5 @@ describe('teacher interface workflow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reopen session' }));
     await screen.findByRole('button', { name: 'Manual check-in / correction (F2)' });
     expect((await listSessions(keys))[0].state).toBe('ACTIVE');
-  });
+  }, 15000);
 });

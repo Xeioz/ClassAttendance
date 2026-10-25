@@ -24,6 +24,9 @@ export default defineConfig({
       },
     },
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'prompt',
       injectRegister: null,
       includeAssets: ['icon.svg'],
@@ -37,14 +40,10 @@ export default defineConfig({
         start_url: '.',
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
-      workbox: {
+      injectManifest: {
         // Precache is cache-first, including lazy scanner/export chunks. No CDN at runtime.
         globPatterns: ['**/*.{html,js,css,svg,png,ico,wasm,json}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-        cleanupOutdatedCaches: true,
-        navigateFallback: 'index.html',
-        skipWaiting: false,
-        clientsClaim: true,
       },
     }),
   ],

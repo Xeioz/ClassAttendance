@@ -1,11 +1,11 @@
+import { teacherOperation } from './operations';
 import Dexie from 'dexie';
 import { db } from '../db/db';
 import { decrypt, encrypt } from '../db/crypto';
 import { assertActiveVault, makeAudit, validateReason } from './audit';
 import { parseQR, punctuality } from './qr';
 import type { AttendancePrivate, ScanResult, SessionPrivate, Student, VaultKeys } from '../types';
-
-export async function recordAttendance(
+async function recordAttendanceInternal(
   keys: VaultKeys,
   sessionId: string,
   input:
@@ -114,8 +114,7 @@ export async function recordAttendance(
     studentToken: student!.token,
   };
 }
-
-export async function correctAttendance(
+async function correctAttendanceInternal(
   keys: VaultKeys,
   sessionId: string,
   student: Student,
@@ -150,6 +149,7 @@ export async function correctAttendance(
       at,
       originalAt: prior?.originalAt ?? (prior && prior.source !== 'SYSTEM' ? prior.at : undefined),
       source: 'MANUAL',
+      ...(status === 'ABSENT' ? { absenceOrigin: 'TEACHER' } : {}),
       reason: reason.trim(),
     },
     `attendance:${sessionId}:${student.token}`,
@@ -176,3 +176,5 @@ export async function correctAttendance(
     await db.scanEvents.add(event);
   });
 }
+export const recordAttendance = teacherOperation(recordAttendanceInternal);
+export const correctAttendance = teacherOperation(correctAttendanceInternal);

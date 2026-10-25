@@ -1,3 +1,4 @@
+import { teacherOperation } from './operations';
 import { db } from '../db/db';
 import { decrypt, encrypt } from '../db/crypto';
 import type {
@@ -82,7 +83,7 @@ export function unresolvedDisputes(events: AuditEntry[]): AuditEntry[] {
   );
 }
 
-export async function flagDispute(
+async function flagDisputeInternal(
   keys: VaultKeys,
   sessionId: string,
   studentToken: string,
@@ -131,7 +132,7 @@ export async function flagDispute(
   });
 }
 
-export async function resolveDispute(
+async function resolveDisputeInternal(
   keys: VaultKeys,
   sessionId: string,
   disputeId: string,
@@ -169,3 +170,7 @@ export async function assertActiveVault(keys: VaultKeys, sessionId: string): Pro
   if ((await db.sessions.get(sessionId))?.state !== 'ACTIVE')
     throw new Error('Reopen the session before changing its records.');
 }
+
+export const flagDispute = teacherOperation(flagDisputeInternal);
+
+export const resolveDispute = teacherOperation(resolveDisputeInternal);
