@@ -18,6 +18,7 @@ import { RosterUpload } from './RosterUpload';
 import { SessionForm } from './SessionForm';
 import { SessionWorkspace } from './SessionWorkspace';
 import { ClassForm } from './ClassForm';
+import { MasterListImport } from './MasterListImport';
 
 export function TeacherWorkspace({
   keys,
@@ -34,6 +35,7 @@ export function TeacherWorkspace({
   const [members, setMembers] = useState<Student[]>([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  const [workspaceNotice, setWorkspaceNotice] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(async () => {
@@ -123,6 +125,14 @@ export function TeacherWorkspace({
   if (!loaded) return <p role="status">Loading your classes and records…</p>;
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+      {workspaceNotice && root && (
+        <p
+          role="status"
+          className="rounded-xl border border-emerald-700 bg-emerald-50 p-4 lg:col-span-2"
+        >
+          {workspaceNotice}
+        </p>
+      )}
       <aside
         aria-label="Classes and sessions"
         className={`card min-w-0 ${root ? '' : 'hidden lg:block'}`}
@@ -145,9 +155,16 @@ export function TeacherWorkspace({
         <button
           className="btn mb-4 w-full"
           disabled={busy}
+          onClick={() => navigate('/teacher/import')}
+        >
+          Import master list
+        </button>
+        <button
+          className="secondary mb-4 w-full"
+          disabled={busy}
           onClick={() => navigate('/teacher/new')}
         >
-          + Add class
+          + Add class manually
         </button>
         <label>
           Find a class
@@ -185,7 +202,7 @@ export function TeacherWorkspace({
         </nav>
         {!classes.length && (
           <p className="mt-4 text-sm text-slate-600">
-            Create a class, then import its student roster.
+            Import a master list to detect classes and complete any missing details.
           </p>
         )}
         <div className="mt-6 grid gap-2 border-t pt-4">
@@ -205,7 +222,7 @@ export function TeacherWorkspace({
           </button>
         </div>
       </aside>
-      <div className={`min-w-0 ${root ? 'hidden lg:block' : ''}`}>
+      <div className={`min-w-0 ${root && classes.length > 0 ? 'hidden lg:block' : ''}`}>
         {!root && (
           <button
             className="secondary mb-4 lg:hidden"
@@ -233,13 +250,25 @@ export function TeacherWorkspace({
             {error}
           </p>
         )}
-        {root ? (
+        {(root && !classes.length) || parts[1] === 'import' ? (
+          <MasterListImport
+            keys={keys}
+            disabled={Boolean(active) || busy}
+            onSaved={async () => {
+              setWorkspaceNotice(
+                'Master list saved. Choose a class to review enrollment or start attendance.',
+              );
+              await refresh();
+              navigate('/teacher');
+            }}
+          />
+        ) : root ? (
           <section className="card">
             <p className="eyebrow">Daily attendance</p>
-            <h2 className="mt-3 text-2xl">Choose a class to begin.</h2>
+            <h2 className="mt-3 text-2xl">Your classes are ready.</h2>
             <p className="mt-3 text-slate-600">
-              Each class keeps its own enrollment and session history. Add your first class using
-              its course, section and term.
+              Each class keeps its own enrollment and session history. Import another master list to
+              add students or classes, or choose an existing class to take attendance.
             </p>
           </section>
         ) : parts[1] === 'new' ? (

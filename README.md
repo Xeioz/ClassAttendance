@@ -33,7 +33,7 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 ## First classroom workflow
 
 1. Choose **I am a Teacher** and create a Master PIN, or unlock the existing workspace. Keep the PIN securely; it cannot be reset to decrypt old records.
-2. Choose **Add class**, enter course, section and term, then import `id,name,section` CSV into that class. Preview additions, matches, name conflicts and section mismatches. Imports add enrollment; omitted students stay enrolled. Try `public/master-list-20-students.csv` with a BSIT-3A class.
+2. Start with **Import master list** (CSV or Excel). Match columns, review detected classes, and fill blank course, section, term, student ID or name fields before saving. Use **Apply only to blank fields** for shared details. Basic and complete CSV templates are available in the importer. The existing `public/master-list-20-students.csv` sample works; supply its missing course and term in the preview. **Add class manually** remains secondary.
 3. Open the class Overview and choose **Start attendance**. Review the device-local start time, report timezone, grace period and generated room challenge. Only one session can be active.
 4. Students choose **I am a Student**, prepare offline resources and bookmark the exact `#/student` URL. They enter ID and the current challenge to display a QR. A root-launching home-screen icon may still show role selection.
 5. Verify identity, start the teacher camera and scan. Manual attendance (F2), sound, torch and compatibility decoding remain available. Success feedback follows a committed save.
@@ -43,6 +43,8 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1
 9. Existing sessions appear under **Unassigned records**. Create the matching course/section/term, then associate each session. This preserves its IDs, attendance, audit and snapshot. Existing section students are copied into a class only after explicit roster review.
 
 Desktop uses class navigation beside the selected workspace. Narrow screens use full-width class and task views with **Back to classes**. Resizing does not mount a second scanner. Defaults apply only to future sessions.
+
+See [master-list import workflow](docs/master-list-import.md) for templates, validation and limits.
 
 See [prototypev2 implementation and validation](docs/prototypev2-release.md) for migration, recovery and remaining device checks.
 
@@ -58,6 +60,7 @@ See [prototypev2 implementation and validation](docs/prototypev2-release.md) for
 | D: reports | `src/domain/reports.ts`, `src/utils/excel.ts`, `csvExport.ts` |
 | Disputes and audit | `src/domain/audit.ts`, `src/components/teacher/DisputePanel.tsx`, `AuditTrail.tsx` |
 | Teacher orchestration | `src/components/teacher/TeacherPortal.tsx`, `TeacherWorkspace.tsx`, `SessionWorkspace.tsx`, `ClassForm.tsx`, `ManualEntryDialog.tsx` |
+| Master-list import | `MasterListImport.tsx`, `src/utils/masterList.ts`, `src/domain/masterListDraft.ts`, `importMasterList.ts` |
 | Classes and safe operations | `src/domain/classes.ts`, `operations.ts`, `src/hooks/route.ts` |
 | Offline caching | `src/sw.ts`, `vite.config.ts`, `src/components/common/OfflineStatus.tsx` |
 

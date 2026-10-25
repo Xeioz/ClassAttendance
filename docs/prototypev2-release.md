@@ -5,6 +5,10 @@
 **Date:** 25 October 2026  
 **Delivery:** browser-based website; no native mobile application
 
+## Import-first update
+
+The teacher first-use task now starts with CSV/Excel master-list import, column mapping and editable missing-field review. Class creation and enrollment save atomically after validation. See [master-list import](master-list-import.md). The suite now passes **58 tests in 12 files**.
+
 ## Implemented workflow
 
 - Root role choice, explicit `#/student` and `#/teacher` destinations, and class/session hash routes compatible with a static repository subpath.
@@ -33,7 +37,7 @@ The website retains prompt-based updates. Teacher update activation checks activ
 ## Verification evidence
 
 - Strict TypeScript project checking.
-- Automated suite: **44 tests across 10 files passed**, covering original attendance/crypto rules plus class isolation, import conflicts, legacy association/retry, additive schema upgrade, class defaults, v1/v2 restoration, explicit absence provenance, role/PIN navigation, pending-operation navigation and restore-entry refresh.
+- Automated suite: **58 tests across 12 files passed**, covering original attendance/crypto rules plus class isolation, import conflicts, legacy association/retry, additive schema upgrade, class defaults, v1/v2 restoration, explicit absence provenance, role/PIN navigation, pending-operation navigation and restore-entry refresh.
 - Service-worker unit checks for manifest-specific resource lookup, missing decoder resources and lookup failures. These mock Workbox and do not replace an actual browser offline test.
 - Production builds for `/` and `/ClassAttendance/`, with emitted JS/CSS references checked against the injected precache manifest.
 - Frozen dependency lockfile verified with pnpm's supply-chain policy check.

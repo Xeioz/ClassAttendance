@@ -109,8 +109,8 @@ describe('role and teacher journeys', () => {
       target: { value: '104928573612' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Create encrypted workspace' }));
-    await screen.findByRole('button', { name: '+ Add class' });
-    fireEvent.click(screen.getByRole('button', { name: '+ Add class' }));
+    await screen.findByRole('button', { name: '+ Add class manually' });
+    fireEvent.click(screen.getByRole('button', { name: '+ Add class manually' }));
     await screen.findByRole('heading', { name: 'Add a class' });
     fireEvent.change(screen.getByLabelText('Course code'), { target: { value: 'IT301' } });
     fireEvent.change(screen.getByLabelText('Section'), { target: { value: 'BSIT-3A' } });
@@ -124,7 +124,7 @@ describe('role and teacher journeys', () => {
     await screen.findByRole('button', { name: /I am a Teacher/ });
     fireEvent.click(screen.getByRole('button', { name: /I am a Teacher/ }));
     await screen.findByRole('heading', { name: 'Unlock teacher portal' });
-    expect(screen.queryByRole('button', { name: '+ Add class' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '+ Add class manually' })).toBeNull();
     expect((screen.getByLabelText('Master PIN (6–12 digits)') as HTMLInputElement).value).toBe('');
   });
 });

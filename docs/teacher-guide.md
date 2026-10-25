@@ -8,7 +8,13 @@ Choose **I am a Teacher**, then create or unlock the teacher workspace using the
 
 ## Roster and session
 
-Choose **Add class** and enter course, section and term. Inside its **Roster** screen, import a CSV with `id,name,section` headers. Choose encoding if the preview looks wrong. Confirm special characters, IDs, section, row count and normalization before saving. Imports add enrollment to the selected class, retain omitted students, and cannot run while a session is active. Name conflicts and mismatched sections must be resolved first. Different classes sharing a section retain independent enrollment.
+The first-use screen starts with **Import master list**. Choose a CSV or Excel (`.xlsx`/`.xls`) file, confirm the worksheet where applicable, and review automatic column matching. Missing columns are left unmapped rather than guessed.
+
+In the preview, fill required course, section and term values for each proposed class. Correct any missing/invalid student IDs or names directly in the student rows. Use **Fill shared blanks across all classes** to apply course, section, term or institution only where empty; imported values are retained. Optional subject, institution and room fields may stay blank. Saving stays disabled until every required field and conflict is resolved, including rows on other pages/classes.
+
+**Confirm and save master list** creates or matches classes by course + section + term and adds enrollment in one transaction. Omitted enrollment is retained, and matched classes keep their current defaults. The same student can belong to multiple courses; duplicate enrollment within one class and conflicting names must be resolved. Close active sessions before importing. Your corrections remain editable after a save error, but an unsaved draft is only in the unlocked page and is lost when leaving/reloading or locking.
+
+Download a basic or complete CSV template from the importer, or use the existing CA sample and fill its missing course/term. **Add class manually** and each class's existing three-column CSV importer remain available as secondary workflows. See [master-list import](master-list-import.md) for limits and column aliases.
 
 From **Overview**, choose **Start attendance** for that class. A room challenge is generated once and can be changed before starting. Institution, subject and room improve exported reports. Verify the start time, displayed device timezone, grace period and room challenge. Announce the challenge to the class. The public challenge is not proof of identity.
 

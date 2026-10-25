@@ -38,6 +38,9 @@
   label {
     @apply grid gap-2 text-sm font-semibold;
   }
+  input[aria-invalid='true'] {
+    @apply border-2 border-amber-700 bg-amber-50;
+  }
   :focus-visible {
     outline: 3px solid #1d4ed8;
     outline-offset: 3px;
