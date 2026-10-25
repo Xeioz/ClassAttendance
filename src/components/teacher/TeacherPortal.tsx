@@ -1,5 +1,6 @@
+import { useInactivityLock } from '../../hooks/inactivityLock';
 import { isTeacherBusy, useTeacherBusy } from '../../domain/operations';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { db, requestPersistence } from '../../db/db';
 import { unlockVault } from '../../db/vault';
 import { errorMessage } from '../../utils/errors';
@@ -8,6 +9,11 @@ import { BackupControls } from './BackupControls';
 import { TeacherWorkspace } from './TeacherWorkspace';
 
 export function TeacherPortal({ onActive }: { onActive: (active: boolean) => void }) {
+  const id = useId();
+  const pinInput = useRef<HTMLInputElement>(null);
+  const confirmationInput = useRef<HTMLInputElement>(null);
+  const [errorField, setErrorField] = useState<'pin' | 'confirmation'>();
+  const unlockAttempt = useRef(0);
   const operationBusy = useTeacherBusy();
   const [lockRequested, setLockRequested] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -19,12 +25,29 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
   const [error, setError] = useState('');
   const [persistence, setPersistence] = useState('');
   useEffect(() => {
+    if (busy) return;
+    if (errorField === 'pin') pinInput.current?.focus();
+    if (errorField === 'confirmation') confirmationInput.current?.focus();
+  }, [errorField, busy]);
+  useEffect(() => {
+    let alive = true;
     void db.meta
       .get('vault')
-      .then((value) => setExists(Boolean(value)))
-      .catch((error) => setError(errorMessage(error)));
+      .then((value) => {
+        if (alive) setExists(Boolean(value));
+      })
+      .catch((error) => {
+        if (alive) setError(errorMessage(error));
+      });
+    return () => {
+      alive = false;
+    };
   }, [keys, revision]);
   const lock = useCallback(() => {
+    unlockAttempt.current++;
+    setPin('');
+    setConfirmation('');
+    setBusy(false);
     if (isTeacherBusy()) {
       setLockRequested(true);
       return;
@@ -36,42 +59,53 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
   useEffect(() => {
     if (lockRequested && !operationBusy) lock();
   }, [lockRequested, operationBusy, lock]);
-  useEffect(() => {
-    if (!keys) return;
-    let timer: number;
-    const reset = () => {
-      clearTimeout(timer);
-      timer = window.setTimeout(lock, 15 * 60_000);
-    };
-    reset();
-    window.addEventListener('pointerdown', reset);
-    window.addEventListener('keydown', reset);
-    window.addEventListener('pagehide', lock);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('pointerdown', reset);
-      window.removeEventListener('keydown', reset);
-      window.removeEventListener('pagehide', lock);
-    };
-  }, [keys, lock]);
+  useInactivityLock(Boolean(keys), lock);
+  useEffect(
+    () => () => {
+      unlockAttempt.current++;
+    },
+    [],
+  );
   async function unlock(event: FormEvent) {
     event.preventDefault();
-    setBusy(true);
+    if (busy) return;
+    const attempt = ++unlockAttempt.current;
     setError('');
+    setErrorField(undefined);
+    if (!/^\d{6,12}$/.test(pin)) {
+      setError('Enter a PIN containing 6–12 digits.');
+      setErrorField('pin');
+      pinInput.current?.focus();
+      return;
+    }
+    setBusy(true);
     try {
       const hasVault = Boolean(await db.meta.get('vault'));
+      if (attempt !== unlockAttempt.current) return;
       setExists(hasVault);
-      if (!hasVault && pin !== confirmation)
-        throw new Error('The new PIN and confirmation must match.');
+      if (!hasVault && pin !== confirmation) {
+        setError('The new PIN and confirmation must match.');
+        setErrorField('confirmation');
+        confirmationInput.current?.focus();
+        return;
+      }
       const unlocked = await unlockVault(pin);
+      if (attempt !== unlockAttempt.current) return;
       setKeys(unlocked);
       setPin('');
       setConfirmation('');
-      setPersistence(await requestPersistence());
+      void requestPersistence()
+        .then((message) => {
+          if (attempt === unlockAttempt.current) setPersistence(message);
+        })
+        .catch(() => {
+          if (attempt === unlockAttempt.current)
+            setPersistence('Storage persistence could not be checked. Keep encrypted backups.');
+        });
     } catch (error) {
-      setError(errorMessage(error));
+      if (attempt === unlockAttempt.current) setError(errorMessage(error));
     } finally {
-      setBusy(false);
+      if (attempt === unlockAttempt.current) setBusy(false);
     }
   }
   return keys ? (
@@ -85,16 +119,18 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
       <TeacherWorkspace keys={keys} onActive={onActive} />
     </>
   ) : (
-    <div className="mx-auto grid max-w-xl gap-5">
-      <form className="card grid gap-5" onSubmit={unlock}>
+    <div className="mx-auto grid max-w-md gap-5">
+      <form noValidate className="card grid gap-5" onSubmit={unlock} aria-busy={busy}>
         <div>
           <p className="eyebrow">Teacher workspace</p>
           <h2 className="mt-2 text-2xl">
-            {exists === undefined
-              ? 'Checking local workspace…'
-              : exists === false
-                ? 'Create your teacher PIN'
-                : 'Unlock teacher portal'}
+            {error && exists === undefined
+              ? 'Storage unavailable'
+              : exists === undefined
+                ? 'Checking local workspace…'
+                : exists === false
+                  ? 'Create your teacher PIN'
+                  : 'Unlock teacher portal'}
           </h2>
           <p className="mt-3 text-sm text-slate-600">
             Records stay in this browser. Your Master PIN is never sent to a server.
@@ -108,6 +144,10 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
         <label>
           Master PIN (6–12 digits)
           <input
+            ref={pinInput}
+            aria-invalid={errorField === 'pin'}
+            aria-describedby={errorField === 'pin' ? `${id}-error` : undefined}
+            disabled={busy}
             type="password"
             inputMode="numeric"
             autoComplete={exists ? 'current-password' : 'new-password'}
@@ -123,6 +163,10 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
           <label>
             Confirm new PIN
             <input
+              ref={confirmationInput}
+              aria-invalid={errorField === 'confirmation'}
+              aria-describedby={errorField === 'confirmation' ? `${id}-error` : undefined}
+              disabled={busy}
               type="password"
               inputMode="numeric"
               autoComplete="new-password"
@@ -148,7 +192,7 @@ export function TeacherPortal({ onActive }: { onActive: (active: boolean) => voi
           </button>
         ) : null}
         {error ? (
-          <p role="alert" className="notice">
+          <p id={`${id}-error`} role="alert" className="notice">
             {error}
           </p>
         ) : null}

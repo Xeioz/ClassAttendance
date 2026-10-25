@@ -1,3 +1,6 @@
+import { usePagination } from '../../hooks/pagination';
+import { Pagination } from '../common/Pagination';
+import { normalizeId } from '../../utils/normalize';
 import { isTeacherBusy, useTeacherBusy } from '../../domain/operations';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { closeSession, recordAttendance, reopenSession } from '../../domain/attendance';
@@ -35,9 +38,19 @@ export function SessionWorkspace({
   const [sound, setSound] = useState(false);
   const [view, setView] = useState<'scan' | 'review'>('scan');
   const [query, setQuery] = useState('');
+  const [reviewing, setReviewing] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
+  const scanGeneration = useRef(0);
+  const reviewState = useRef(false);
+  const onReviewChange = useCallback((value: boolean) => {
+    if (reviewState.current === value) return;
+    reviewState.current = value;
+    scanGeneration.current++;
+    setReviewing(value);
+    if (!value) setResult(undefined);
+  }, []);
   const sequence = useRef(0);
   const active = session?.state === 'ACTIVE';
   const refresh = useCallback(async () => {
@@ -72,6 +85,7 @@ export function SessionWorkspace({
         session?.state === 'ACTIVE' &&
         !pending &&
         !busy &&
+        !reviewing &&
         !isTeacherBusy()
       ) {
         event.preventDefault();
@@ -80,7 +94,7 @@ export function SessionWorkspace({
     };
     window.addEventListener('keydown', shortcut);
     return () => window.removeEventListener('keydown', shortcut);
-  }, [session?.state, pending, busy]);
+  }, [session?.state, pending, busy, reviewing]);
   async function refreshAfterSave() {
     try {
       await refresh();
@@ -89,13 +103,16 @@ export function SessionWorkspace({
     }
   }
   async function scan(raw: string) {
-    if (!session) return;
+    if (!session || reviewState.current) return;
+    const generation = scanGeneration.current;
     try {
       const outcome = await recordAttendance(keys, session.id, { raw });
+      if (generation !== scanGeneration.current) return;
       setResult(outcome);
       if (outcome.kind !== 'duplicate') feedback(outcome.kind === 'valid', sound);
       await refreshAfterSave();
     } catch (error) {
+      if (generation !== scanGeneration.current) return;
       setResult({ kind: 'error', title: 'Not saved', detail: errorMessage(error) });
       feedback(false, sound);
     }
@@ -134,9 +151,21 @@ export function SessionWorkspace({
   const summary = session ? attendanceSummary(session, attendance) : undefined;
   const pendingDisputes = unresolvedDisputes(events).length;
   const filtered =
-    session?.roster.filter((student) =>
-      `${student.name} ${student.id}`.toLowerCase().includes(query.toLowerCase()),
-    ) ?? [];
+    session?.roster.filter((student) => {
+      let normalized = query.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      try {
+        normalized = normalizeId(query);
+      } catch {
+        /* Names use the text search. */
+      }
+      return (
+        `${student.name} ${student.displayId ?? student.id} ${student.id}`
+          .toLowerCase()
+          .includes(query.toLowerCase()) ||
+        (normalized.length > 0 && student.id.includes(normalized))
+      );
+    }) ?? [];
+  const pages = usePagination(filtered, 50, `${sessionId}:${query}`);
   return (
     <div className="mb-5 grid gap-5">
       {session && summary ? (
@@ -145,14 +174,14 @@ export function SessionWorkspace({
             <nav aria-label="Attendance task" className="flex flex-wrap gap-2">
               <button
                 className={view === 'scan' ? 'btn' : 'secondary'}
-                disabled={pending || busy || operationBusy || manualOpen}
+                disabled={pending || busy || operationBusy || manualOpen || reviewing}
                 onClick={() => setView('scan')}
               >
                 Scan attendance
               </button>
               <button
                 className={view === 'review' ? 'btn' : 'secondary'}
-                disabled={pending || busy || operationBusy || manualOpen}
+                disabled={pending || busy || operationBusy || manualOpen || reviewing}
                 onClick={() => setView('review')}
               >
                 Review attendance
@@ -186,15 +215,22 @@ export function SessionWorkspace({
               )}
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-3">
-              {[
-                ['Enrolled', summary.total],
-                ['Present', summary.counts.PRESENT],
-                ['Late', summary.counts.LATE],
-                ['Not yet recorded', summary.counts.PENDING],
-                ['Absent', summary.counts.ABSENT],
-                ['Excused', summary.counts.EXCUSED],
-              ].map(([label, value]) => (
-                <div className="rounded-xl bg-paper p-4" key={label}>
+              {(view === 'scan' && active
+                ? [
+                    ['Enrolled', summary.total],
+                    ['Recorded', summary.total - summary.counts.PENDING],
+                    ['Not yet recorded', summary.counts.PENDING],
+                  ]
+                : [
+                    ['Enrolled', summary.total],
+                    ['Present', summary.counts.PRESENT],
+                    ['Late', summary.counts.LATE],
+                    ['Not yet recorded', summary.counts.PENDING],
+                    ['Absent', summary.counts.ABSENT],
+                    ['Excused', summary.counts.EXCUSED],
+                  ]
+              ).map(([label, value]) => (
+                <div className="metric" key={label}>
                   <p className="text-xs font-semibold text-slate-600">{label}</p>
                   <p className="mt-2 text-2xl font-semibold tabular-nums sm:text-3xl">{value}</p>
                 </div>
@@ -211,17 +247,17 @@ export function SessionWorkspace({
                 <h2 className="text-xl">Record attendance</h2>
                 <button
                   className="secondary"
-                  disabled={pending || busy || operationBusy}
+                  disabled={pending || busy || operationBusy || reviewing}
                   onClick={() => setManualOpen(true)}
                 >
                   Manual check-in / correction (F2)
                 </button>
               </div>
-              <AccessibleHUD result={result} />
+              <AccessibleHUD result={result} processing={pending} />
               {result?.kind === 'duplicate' && (
                 <button
                   className="secondary justify-self-start"
-                  disabled={pending || busy || operationBusy}
+                  disabled={pending || busy || operationBusy || reviewing}
                   onClick={() => setView('review')}
                 >
                   Pause and review duplicate
@@ -249,7 +285,7 @@ export function SessionWorkspace({
                 key={session.id}
                 onScan={scan}
                 onPending={setPending}
-                paused={manualOpen || view !== 'scan' || busy}
+                paused={manualOpen || reviewing || view !== 'scan' || busy}
               />
               {manualOpen ? (
                 <p className="text-sm">Camera paused while manual attendance is open.</p>
@@ -292,12 +328,13 @@ export function SessionWorkspace({
             className={view === 'review' || session.state === 'CLOSED' ? 'grid gap-5' : 'hidden'}
           >
             <DisputePanel
-              key={`${session.id}:${result?.studentToken ?? ''}`}
+              key={session.id}
               keys={keys}
               session={session}
               events={events}
               candidate={result}
               onChanged={refreshAfterSave}
+              onReviewChange={onReviewChange}
             />
           </div>
           <section
@@ -330,7 +367,7 @@ export function SessionWorkspace({
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((student) => {
+                  {pages.visible.map((student) => {
                     const entry = attendance.get(student.token);
                     return (
                       <tr key={student.token} className="border-t">
@@ -350,6 +387,13 @@ export function SessionWorkspace({
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={pages.page}
+              pageSize={50}
+              count={filtered.length}
+              label="Attendance roster pages"
+              onPage={pages.setPage}
+            />
             {session.state === 'ACTIVE' ? (
               <div className="mt-5 border-t pt-5">
                 <label className="flex min-h-12 items-center gap-3 font-normal">

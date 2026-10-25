@@ -89,6 +89,7 @@ async function flagDisputeInternal(
   studentToken: string,
   reason: string,
   secondAt = Date.now(),
+  expectedFirstAt?: number,
 ): Promise<void> {
   validateReason(reason);
   const session = await db.sessions.get(sessionId);
@@ -107,6 +108,11 @@ async function flagDisputeInternal(
     record.encrypted,
     `attendance:${sessionId}:${studentToken}`,
   );
+  if (
+    expectedFirstAt !== undefined &&
+    (!Number.isFinite(expectedFirstAt) || expectedFirstAt !== (prior.originalAt ?? prior.at))
+  )
+    throw new Error('The original attendance changed. Cancel this review and scan again.');
   const history = await readAudit(keys, sessionId);
   if (unresolvedDisputes(history).some((event) => event.studentToken === studentToken))
     throw new Error('This student already has an unresolved dispute.');

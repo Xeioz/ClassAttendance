@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { flagDispute, resolveDispute, unresolvedDisputes } from '../../domain/audit';
 import { errorMessage } from '../../utils/errors';
+import { t } from '../../i18n';
 import type { AuditEntry, ScanResult, Session, VaultKeys } from '../../types';
+
+interface DisputeDraft {
+  sessionId: string;
+  studentToken: string;
+  name: string;
+  firstAt: number;
+  secondAt: number;
+  reason: string;
+}
 
 export function DisputePanel({
   keys,
@@ -9,68 +19,161 @@ export function DisputePanel({
   events,
   candidate,
   onChanged,
+  onReviewChange,
 }: {
   keys: VaultKeys;
   session: Session;
   events: AuditEntry[];
   candidate?: ScanResult;
   onChanged: () => Promise<void>;
+  onReviewChange?: (reviewing: boolean) => void;
 }) {
-  const [reason, setReason] = useState('');
+  const [draft, setDraft] = useState<DisputeDraft>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const operation = useRef(0);
   const pending = unresolvedDisputes(events);
+  // Session switches/closure invalidate the entire review, including pending UI work.
+  useEffect(() => {
+    operation.current++;
+    setDraft(undefined);
+    setBusy(false);
+    setError('');
+    onReviewChange?.(false);
+    return () => {
+      operation.current++;
+      onReviewChange?.(false);
+    };
+  }, [session.id, session.state, onReviewChange]);
+  const currentDraft =
+    draft?.sessionId === session.id && session.state === 'ACTIVE' ? draft : undefined;
+  const candidateStudent = session.roster.find(
+    (student) => student.token === candidate?.studentToken,
+  );
+  const canReview =
+    candidate?.kind === 'duplicate' &&
+    session.state === 'ACTIVE' &&
+    candidateStudent &&
+    Number.isFinite(candidate.firstAt) &&
+    Number.isFinite(candidate.secondAt);
+  function beginReview() {
+    if (!canReview || !candidateStudent || !candidate) return;
+    setError('');
+    setDraft({
+      sessionId: session.id,
+      studentToken: candidateStudent.token,
+      name: `${candidateStudent.name} · ${candidateStudent.displayId ?? candidateStudent.id}`,
+      firstAt: candidate.firstAt!,
+      secondAt: candidate.secondAt!,
+      reason: '',
+    });
+    onReviewChange?.(true);
+  }
+  function cancelReview() {
+    if (busy) return;
+    operation.current++;
+    setDraft(undefined);
+    setError('');
+    onReviewChange?.(false);
+  }
   async function flag() {
-    if (!candidate?.studentToken) return;
+    if (!currentDraft || busy) return;
+    const review = currentDraft;
+    const ticket = operation.current;
     setBusy(true);
     setError('');
     try {
-      await flagDispute(keys, session.id, candidate.studentToken, reason, candidate.secondAt);
-      setReason('');
+      await flagDispute(
+        keys,
+        review.sessionId,
+        review.studentToken,
+        review.reason,
+        review.secondAt,
+        review.firstAt,
+      );
+    } catch (error) {
+      if (ticket === operation.current) {
+        setError(errorMessage(error));
+        setBusy(false);
+      }
+      return;
+    }
+    if (ticket !== operation.current) return;
+    // Once committed, never offer the same draft as an unsaved retry.
+    setDraft(undefined);
+    onReviewChange?.(false);
+    try {
       await onChanged();
     } catch (error) {
-      setError(errorMessage(error));
+      if (ticket === operation.current)
+        setError(t('dispute.savedRefreshFailed', { error: errorMessage(error) }));
     } finally {
-      setBusy(false);
+      if (ticket === operation.current) setBusy(false);
     }
   }
   return (
     <section className="card">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl">Dispute review</h2>
-        <p className="text-sm font-semibold">{pending.length} unresolved</p>
+        <h2 className="text-xl">{t('dispute.title')}</h2>
+        <p className="text-sm font-semibold">{t('dispute.count', { count: pending.length })}</p>
       </div>
-      <p className="my-3 text-sm text-slate-600">
-        A duplicate alone is not misconduct. Check the student’s identity. Flagging preserves
-        attendance and both presentation times.
-      </p>
-      {candidate?.kind === 'duplicate' && session.state === 'ACTIVE' ? (
+      <p className="my-3 text-sm text-slate-600">{t('dispute.description')}</p>
+      {currentDraft ? (
         <div className="mb-4 grid gap-3 border-b pb-4">
-          <p className="text-sm font-semibold">{candidate.detail}</p>
+          <p className="text-sm font-semibold">
+            {t('dispute.reviewing', { name: currentDraft.name })}
+          </p>
+          <p role="status" className="notice">
+            {t('dispute.paused')}
+          </p>
+          <p className="text-sm">
+            {t('dispute.first', { time: new Date(currentDraft.firstAt).toLocaleString() })}
+            <br />
+            {t('dispute.second', { time: new Date(currentDraft.secondAt).toLocaleString() })}
+          </p>
           <label>
-            Reason for disputing this check-in
+            {t('dispute.reason')}
             <textarea
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
+              value={currentDraft.reason}
+              onChange={(event) => setDraft({ ...currentDraft, reason: event.target.value })}
               minLength={3}
               maxLength={500}
+              disabled={busy}
             />
           </label>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="secondary"
+              disabled={
+                busy ||
+                currentDraft.reason.trim().length < 3 ||
+                pending.some((event) => event.studentToken === currentDraft.studentToken)
+              }
+              onClick={() => void flag()}
+            >
+              {busy ? t('dispute.saving') : t('dispute.flag')}
+            </button>
+            <button className="secondary" disabled={busy} onClick={cancelReview}>
+              {t('dispute.cancel')}
+            </button>
+          </div>
+        </div>
+      ) : canReview ? (
+        <div className="mb-4 grid gap-3 border-b pb-4">
+          <p className="text-sm font-semibold">{candidate.detail}</p>
           <button
             className="secondary justify-self-start"
             disabled={
-              busy ||
-              reason.trim().length < 3 ||
-              pending.some((event) => event.studentToken === candidate.studentToken)
+              busy || pending.some((event) => event.studentToken === candidate.studentToken)
             }
-            onClick={() => void flag()}
+            onClick={beginReview}
           >
-            Flag disputed check-in
+            {t('dispute.review')}
           </button>
         </div>
       ) : null}
       {!pending.length ? (
-        <p className="text-sm text-slate-600">No unresolved disputes.</p>
+        <p className="text-sm text-slate-600">{t('dispute.empty')}</p>
       ) : (
         pending.map((event) => (
           <DisputeRow
@@ -79,9 +182,9 @@ export function DisputePanel({
             name={
               session.roster.find((student) => student.token === event.studentToken)?.name ??
               event.studentId ??
-              'Student'
+              t('audit.student')
             }
-            disabled={session.state !== 'ACTIVE'}
+            disabled={session.state !== 'ACTIVE' || Boolean(currentDraft)}
             resolve={async (reason) => {
               await resolveDispute(keys, session.id, event.eventId, reason);
               await onChanged();
@@ -97,6 +200,7 @@ export function DisputePanel({
     </section>
   );
 }
+
 function DisputeRow({
   event,
   name,
@@ -125,14 +229,23 @@ function DisputeRow({
     >
       <p className="font-semibold">{name}</p>
       <p className="text-sm">
-        First presentation: {event.firstAt ? new Date(event.firstAt).toLocaleString() : 'Unknown'}
+        {t('dispute.first', {
+          time:
+            event.firstAt !== undefined
+              ? new Date(event.firstAt).toLocaleString()
+              : t('dispute.unknown'),
+        })}
         <br />
-        Second presentation:{' '}
-        {event.secondAt ? new Date(event.secondAt).toLocaleString() : 'Unknown'}
+        {t('dispute.second', {
+          time:
+            event.secondAt !== undefined
+              ? new Date(event.secondAt).toLocaleString()
+              : t('dispute.unknown'),
+        })}
       </p>
       <p className="text-sm">{event.reason}</p>
       <label>
-        Resolution and identity-check outcome
+        {t('dispute.resolution')}
         <textarea
           value={reason}
           onChange={(input) => setReason(input.target.value)}
@@ -142,12 +255,9 @@ function DisputeRow({
           disabled={disabled || busy}
         />
       </label>
-      <p className="text-xs">
-        Resolving the review keeps the attendance status. Use manual correction separately if
-        needed.
-      </p>
+      <p className="text-xs">{t('dispute.resolutionHint')}</p>
       <button className="secondary justify-self-start" disabled={disabled || busy}>
-        Resolve dispute
+        {t('dispute.resolve')}
       </button>
       {error ? <p role="alert">{error}</p> : null}
     </form>
